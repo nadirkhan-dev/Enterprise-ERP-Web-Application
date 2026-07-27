@@ -1,0 +1,218 @@
+name: PR Auto-Summary
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  generate-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          DIFF=$(git diff origin/${{ github.event.pull_request.base.ref }}...HEAD --no-color)
+          
+          MAX_CHARS=150000
+          if [ ${#DIFF} -gt $MAX_CHARS ]; then
+            DIFF="${DIFF:0:$MAX_CHARS}
+            
+            ... [diff truncated due to size]"
+          fi
+          
+          echo "$DIFF" > /tmp/pr_diff.txt
+
+      - name: Generate title and change bullets with OpenAI
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          DIFF_CONTENT=$(cat /tmp/pr_diff.txt)
+
+          USER_PROMPT="The current pull request title is: \"$PR_TITLE\"
+
+          The diff is below. Produce two things:
+
+          1. A concise, descriptive PR title (max ~70 chars), imperative mood, no trailing period. Don't add a type prefix like 'feat:' unless the current title already uses one. If the current title is already clear and accurate, return it unchanged.
+          2. 2-3 bullets for a customer-facing 'What's New' section:
+          - Plain, user-friendly language. No code references, no file names, no internal jargon.
+          - Describe what someone using the product can now do, see, or experience differently.
+          - Each bullet must start with '- ' and be one short line.
+          - Each bullet must describe a DISTINCT change. Do NOT restate the same change.
+          - If the PR makes one user-facing change, output ONE bullet. Do not pad.
+          - If — and only if — the change is purely internal with zero impact on any user (including developers using internal tooling), output exactly one bullet: '- Internal improvements (no user-facing changes)'. Changes to developer tooling, CI/CD, and automation ARE user-facing for the developers who use them.
+
+          Respond with ONLY a JSON object: {\"title\": \"...\", \"bullets\": \"- ...\\n- ...\"}
+          No markdown, no code fences, no preamble.
+
+          DIFF:
+          $DIFF_CONTENT"
+
+          PAYLOAD=$(jq -n \
+            --arg model "gpt-5.4-nano" \
+            --arg prompt "$USER_PROMPT" \
+            '{
+              model: $model,
+              max_completion_tokens: 300,
+              temperature: 0.3,
+              response_format: { type: "json_object" },
+              messages: [
+                {role: "system", content: "You write PR titles and release-note bullets. Plain language, no jargon, no implementation details, no file names. Each bullet is a distinct change. Respond only with the requested JSON object."},
+                {role: "user", content: $prompt}
+              ]
+            }')
+
+          RESPONSE=$(curl -sS https://api.openai.com/v1/chat/completions \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+
+          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+
+          if [ -z "$CONTENT" ]; then
+            echo "Failed to generate content. API response:"
+            echo "$RESPONSE"
+            exit 1
+          fi
+
+          # response_format guarantees a JSON object, but strip stray fences as insurance.
+          CLEAN=$(echo "$CONTENT" | sed '/^```/d')
+          TITLE=$(echo "$CLEAN" | jq -r '.title // empty')
+          BULLETS=$(echo "$CLEAN" | jq -r '.bullets // empty')
+
+          if [ -z "$BULLETS" ]; then
+            echo "No bullets in model output. Raw content:"
+            echo "$CONTENT"
+            exit 1
+          fi
+
+          # Title is best-effort: if absent, the update step keeps the existing title.
+          echo "$TITLE" > /tmp/title.txt
+          echo "$BULLETS" > /tmp/bullets.txt
+
+          echo "Generated title: $TITLE"
+          echo "Generated bullets:"
+          echo "$BULLETS"
+
+      - name: Debug auth
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "GH_TOKEN length: ${#GH_TOKEN}"          # 0 = token not injected
+          gh auth status || true
+          echo "--- REST auth check ---"
+          gh api user --jq .login || true
+          echo "--- GraphQL auth check ---"
+          gh api graphql -f query='{ viewer { login } }' || true
+
+      - name: Update PR title and description
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          ACTION: ${{ github.event.action }}
+          # Set to "true" to re-title on every push, not just on open.
+          ALWAYS_RETITLE: "false"
+        run: |
+          # REST (not `gh pr view`, which uses GraphQL) so this still works if
+          # GraphQL is the blocked endpoint. `// ""` guards a null body.
+          gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""' > /tmp/current_body.md
+
+          python3 <<'PYEOF' > /tmp/updated_body.md
+          import re, pathlib
+          
+          body = pathlib.Path('/tmp/current_body.md').read_text()
+          bullets = pathlib.Path('/tmp/bullets.txt').read_text().strip()
+          
+          MARKER_START = '<!-- ai-bullets-start -->'
+          MARKER_END = '<!-- ai-bullets-end -->'
+          ai_block = f'{MARKER_START}\n{bullets}\n{MARKER_END}'
+          
+          # Strategy: if a "## Changes" section exists, replace its ENTIRE body
+          # (everything between the heading+comments and the next "## " heading or EOF)
+          # with the AI block. This works whether or not markers were already present —
+          # any stray bullets, stale AI output, or partial author edits get cleaned up.
+          # The template's HTML comments under "## Changes" are preserved.
+          
+          # Match heading + only the *template* comments under it. Explicitly exclude
+          # the ai-bullets markers from the comment group, otherwise the prior marker
+          # gets folded into the preserved header and the new block ends up duplicated.
+          changes_section = re.compile(
+              r'(^##\s+Changes\s*\n'                                            # heading
+              r'(?:[ \t]*<!--(?!\s*ai-bullets-(?:start|end)\s*-->).*?-->'       # template comments only
+              r'[ \t]*\n)*)'
+              r'.*?'                                                            # current body — replaced
+              r'(?=^##\s|\Z)',                                                  # next heading or EOF
+              re.MULTILINE | re.DOTALL,
+          )
+          
+          if changes_section.search(body):
+              new_body = changes_section.sub(
+                  lambda m: f'{m.group(1)}{ai_block}\n\n',
+                  body,
+                  count=1,
+              )
+          else:
+              # No "## Changes" heading at all — prepend one
+              new_body = f'## Changes\n{ai_block}\n\n{body}'
+          
+          # Collapse any 3+ consecutive blank lines down to 2 (defensive cleanup)
+          new_body = re.sub(r'\n{3,}', '\n\n', new_body)
+          
+          print(new_body, end='')
+          PYEOF
+          
+          # REST PATCH (not `gh pr edit`, which uses GraphQL). Always update the
+          # body. Only update the title on the initial "opened" event so we don't
+          # clobber a title the author has since hand-edited; ALWAYS_RETITLE overrides.
+          # Build the JSON with jq so multiline markdown / special chars escape safely.
+          NEW_TITLE=$(cat /tmp/title.txt)
+
+          if [ -n "$NEW_TITLE" ] && { [ "$ACTION" = "opened" ] || [ "$ALWAYS_RETITLE" = "true" ]; }; then
+            jq -Rs --arg title "$NEW_TITLE" '{ body: ., title: $title }' /tmp/updated_body.md \
+              | gh api -X PATCH "repos/$REPO/pulls/$PR_NUMBER" --input -
+            echo "✅ PR title and description updated"
+          else
+            jq -Rs '{ body: . }' /tmp/updated_body.md \
+              | gh api -X PATCH "repos/$REPO/pulls/$PR_NUMBER" --input -
+            echo "✅ PR description updated (title left unchanged)"
+          fi
+
+      # Validate the FINAL body in this same run — so the gate always sees the
+      # AI-filled bullets, instead of racing the separate PR Description Check
+      # (which can't re-trigger off this bot's GITHUB_TOKEN edit).
+      - name: Validate Changes section
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          PR_BODY=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
+
+          if [ -z "$PR_BODY" ]; then
+            echo "::error::PR description is empty. Please fill in the ## Changes section from the template."
+            exit 1
+          fi
+
+          if ! echo "$PR_BODY" | grep -q "## Changes"; then
+            echo "::error::Missing '## Changes' section. Please use the PR template."
+            exit 1
+          fi
+
+          CHANGES=$(echo "$PR_BODY" | sed -n '/## Changes/,/## /p' | grep -c '^\s*- .' || true)
+
+          if [ "$CHANGES" -eq 0 ]; then
+            echo "::error::No change items found. Add at least one '- ' bullet under ## Changes."
+            exit 1
+          fi
+
+          echo "Found $CHANGES change(s). PR description looks good."

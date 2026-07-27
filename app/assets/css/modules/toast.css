@@ -1,0 +1,158 @@
+/* Mobile: the stack is anchored below the top nav so a toast never covers the
+   search bar (the typed query stays visible behind its result toast). Position
+   and width only — the toast's own chrome (radius, type, color) comes from the
+   Toast preset and is identical at every width. */
+.p-toast {
+  width: calc(100% - (var(--p-spacing-4) * 2));
+  left: var(--p-spacing-4);
+  right: var(--p-spacing-4);
+  top: calc(var(--app-top-nav-height, var(--p-layout-top-nav-height)) + var(--p-spacing-2)) !important;
+
+  @media (min-width: 768px) {
+    width: var(--p-toast-width, 25rem);
+    left: auto;
+    right: auto;
+    top: var(--p-spacing-5) !important;
+  }
+}
+
+/* Severity icon and close button ride the heading's line box instead of the top
+   edge of the whole text block, so both optically center on the summary line
+   however many lines the detail wraps to. */
+.p-toast-message-content {
+  align-items: flex-start;
+}
+
+.p-toast-message-icon,
+.p-toast-close-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: var(--p-spacing-5);
+}
+
+/* Dismiss button: the bare icon is the affordance — no ring, focus ring, or
+   hover disc around it (matches the cross-scope toast's close button). */
+.p-toast-close-button {
+  background: transparent;
+  border: none;
+  outline: 0 none;
+  box-shadow: none;
+}
+
+.p-toast-close-button:hover,
+.p-toast-close-button:focus-visible {
+  background: transparent;
+  box-shadow: none;
+  outline: 0 none;
+}
+
+.search-scope-results-toast.p-toast-message {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.search-scope-results-toast-group .p-toast-message-leave-active {
+  position: absolute;
+  width: 100%;
+}
+
+.search-scope-results-toast-group .p-toast-message-move {
+  transition: transform var(--p-transition-duration-slow) var(--p-transition-timing-ease-out);
+}
+
+.search-scope-results-toast__card {
+  display: flex;
+  align-items: center;
+  gap: var(--p-toast-content-gap);
+  width: 100%;
+  min-width: 0;
+  padding: var(--p-toast-content-padding);
+  background: var(--p-skyblue-50);
+  border: 1px solid var(--p-skyblue-200);
+  border-radius: var(--p-toast-border-radius);
+  box-shadow: var(--p-shadow-sm);
+  backdrop-filter: blur(calc(var(--p-spacing-px) * 0.75));
+}
+
+/* Error variant — the auto-dismissing "No results found" card. Same layout as
+   the results card so the two read as one consistent stack. */
+.search-scope-results-toast__card--error {
+  background: var(--p-red-50);
+  border-color: var(--p-red-200);
+}
+
+.search-scope-results-toast__card--error .search-scope-results-toast__icon,
+.search-scope-results-toast__card--error .search-scope-results-toast__text,
+.search-scope-results-toast__card--error .search-scope-results-toast__close.base-icon-button {
+  color: var(--p-red-500);
+}
+
+.search-scope-results-toast__icon {
+  flex-shrink: 0;
+  color: var(--p-skyblue-600);
+  font-size: var(--p-toast-icon-size);
+}
+
+.search-scope-results-toast__body {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--p-toast-content-gap);
+  min-width: 0;
+}
+
+.search-scope-results-toast__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--p-skyblue-600);
+  font-size: var(--p-font-size-sm);
+  font-weight: var(--p-font-weight-semibold);
+  line-height: var(--p-spacing-5);
+  font-feature-settings: 'liga' off, 'clig' off;
+}
+
+.search-scope-results-toast__view.p-button {
+  flex-shrink: 0;
+  gap: var(--p-spacing-1-75);
+  padding: calc(var(--p-spacing-px) * 5.25) calc(var(--p-spacing-px) * 8.75);
+  background: var(--p-surface-0);
+  border: 1px solid var(--p-skyblue-200);
+  border-radius: var(--p-button-rounded-border-radius);
+  color: var(--p-skyblue-600);
+  font-size: var(--p-font-size-xs);
+  font-weight: var(--p-font-weight-semibold);
+  line-height: var(--p-spacing-2-5);
+  font-feature-settings: 'liga' off, 'clig' off;
+}
+
+.search-scope-results-toast__view.p-button .p-button-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--p-spacing-px) * 15);
+}
+
+.search-scope-results-toast__close.base-icon-button {
+  flex-shrink: 0;
+  margin-left: auto;
+  border-radius: var(--p-border-radius-full);
+  color: var(--p-skyblue-600);
+}
+
+/* Drawer-contact toast — constrained to drawer width (92vw from drawer.css) */
+.drawer-contact-toast {
+  width: calc(91vw - (var(--p-spacing-5) * 2));
+  right: 1.45rem !important;
+  top: var(--p-spacing-4);
+  left: auto;
+
+  @media (min-width: 768px) {
+    width: var(--p-toast-width, 25rem);
+    right: auto;
+    top: auto;
+    left: auto;
+  }
+}

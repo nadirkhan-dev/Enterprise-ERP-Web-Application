@@ -1,0 +1,35 @@
+name: PR Description Check
+# Only runs on manual description edits. The opened/synchronize path is handled
+# by PR Auto-Summary, which generates the bullets AND validates them in the same
+# run — avoiding the race where this check read the body before the bot filled it.
+on:
+  pull_request:
+    types: [edited]
+    branches: [dev]
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Changes section exists
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [ -z "$PR_BODY" ]; then
+            echo "::error::PR description is empty. Please fill in the ## Changes section from the template."
+            exit 1
+          fi
+
+          if ! echo "$PR_BODY" | grep -q "## Changes"; then
+            echo "::error::Missing '## Changes' section. Please use the PR template."
+            exit 1
+          fi
+
+          CHANGES=$(echo "$PR_BODY" | sed -n '/## Changes/,/## /p' | grep -c '^\s*- .' || true)
+
+          if [ "$CHANGES" -eq 0 ]; then
+            echo "::error::No change items found. Add at least one '- ' bullet under ## Changes."
+            exit 1
+          fi
+
+          echo "Found $CHANGES change(s). PR description looks good."

@@ -1,0 +1,244 @@
+.form-field {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    position: relative;
+}
+
+.form-field__label {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal);
+    color: var(--p-gray-800);
+    line-height: var(--p-font-line-height-normal);
+}
+
+.form-field__required {
+    color: var(--p-red-500);
+}
+.form-field__label-row {
+    display: flex;
+    align-items: center;
+    gap: var(--p-spacing-1-75);
+}
+
+.form-field__label-row .form-field__label {
+    flex: 1;
+    min-width: 0;
+}
+
+.form-field__error {
+    font-size: var(--p-font-size-sm);
+    color: var(--p-red-700);
+    line-height: var(--p-font-line-height-normal);
+}
+
+/* Invalid-field attention pulse Base error animation for every input: a subtle inset ring that breathes 0 → 1px while the field is invalid, matching the contact phone input. Pauses while focused/hovered so it never distracts during typing, and honours reduced-motion. */
+@keyframes field-error-pulse {
+    0%,
+    100% {
+        box-shadow: inset 0 0 0 0 var(--p-red-400);
+    }
+
+    50% {
+        box-shadow: inset 0 0 0 1px var(--p-red-400);
+    }
+}
+
+.p-inputtext.p-invalid:not(:focus):not(:hover),
+.p-textarea.p-invalid:not(:focus):not(:hover),
+.p-select.p-invalid:not(:focus-within):not(:hover),
+.p-multiselect.p-invalid:not(:focus-within):not(:hover),
+.p-inputnumber.p-invalid:not(:focus-within):not(:hover),
+.p-autocomplete.p-invalid:not(:focus-within):not(:hover),
+.p-datepicker.p-invalid:not(:focus-within):not(:hover),
+.p-password.p-invalid:not(:focus-within):not(:hover) {
+    animation: field-error-pulse var(--p-field-pulse-duration) var(--p-transition-timing-ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .p-inputtext.p-invalid,
+    .p-textarea.p-invalid,
+    .p-select.p-invalid,
+    .p-multiselect.p-invalid,
+    .p-inputnumber.p-invalid,
+    .p-autocomplete.p-invalid,
+    .p-datepicker.p-invalid,
+    .p-password.p-invalid {
+        animation: none;
+    }
+}
+
+/* On error, the typed value (and placeholder) turn red too — not just the
+   border — so wrong data reads as red end-to-end. */
+.p-inputtext.p-invalid,
+.p-textarea.p-invalid,
+.p-inputnumber.p-invalid .p-inputtext,
+.p-autocomplete.p-invalid .p-autocomplete-input,
+.p-select.p-invalid .p-select-label,
+.p-multiselect.p-invalid .p-multiselect-label {
+    color: var(--p-red-700);
+}
+
+.p-inputtext.p-invalid::placeholder,
+.p-textarea.p-invalid::placeholder,
+.p-inputnumber.p-invalid .p-inputtext::placeholder,
+.p-select.p-invalid .p-select-label.p-placeholder,
+.p-multiselect.p-invalid .p-multiselect-label.p-placeholder {
+    color: var(--p-red-700);
+}
+
+.form-field__label--required::after {
+    content: ' *';
+    color: var(--p-red-500);
+}
+.p-message-error,
+.p-message[data-p~='error'] {
+    border-radius: var(--p-border-radius-xs);
+}
+
+.p-message-error .p-message-text,
+.p-message[data-p~='error'] .p-message-text {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-medium);
+    color: var(--p-red-700);
+}
+
+/* Scoped to the Phone Numbers section, shown directly above the phone edit
+   form. Full width, red border, light red fill, exclamation icon and bold red
+   text to match the app error style. */
+.phone-error-banner {
+    margin: 0 0 var(--p-spacing-3);
+    width: 100%;
+}
+
+.phone-error-banner.p-message {
+    background: var(--p-red-50);
+    border-color: var(--p-red-300);
+    border-radius: var(--p-border-radius-xs);
+}
+
+.phone-error-banner .p-message-content {
+    gap: var(--p-spacing-2);
+    flex-wrap: nowrap;
+}
+
+.phone-error-banner .p-message-icon,
+.phone-error-banner .p-message-text {
+    color: var(--p-red-700);
+}
+
+.phone-error-banner .p-message-text {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-medium);
+    white-space: normal;
+
+    @media (min-width: 768px) {
+        white-space: nowrap;
+    }
+}
+
+.phone-error-banner .p-message-icon {
+    font-size: var(--p-font-size-base);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--p-spacing-3);
+
+    @media (min-width: 768px) {
+        grid-template-columns: 1fr 1fr;
+        gap: var(--p-spacing-4);
+    }
+}
+
+.form-row--full {
+    grid-template-columns: 1fr;
+}
+
+.form-field .p-inputtext {
+    width: 100%;
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal);
+}
+
+.p-textarea {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal);
+    resize: vertical;
+}
+
+.form-field .p-select {
+    width: 100%;
+    font-size: var(--p-font-size-sm);
+}
+
+.p-select-label {
+    font-size: var(--p-font-size-sm);
+}
+
+.p-select-option-label {
+    font-weight: var(--p-font-weight-normal);
+}
+
+.form-field .p-multiselect {
+    width: 100%;
+    font-size: var(--p-font-size-sm);
+}
+
+.p-multiselect-option {
+    font-weight: var(--p-font-weight-normal) !important;
+}
+
+.form-field .p-autocomplete {
+    width: 100%;
+    font-size: var(--p-font-size-sm);
+}
+
+.p-autocomplete-input-chip input {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal);
+}
+
+.p-autocomplete-option {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal) !important;
+}
+
+.p-autocomplete-chip.p-chip {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal);
+}
+
+.checkbox-field {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--p-spacing-2);
+}
+
+.checkbox-field__label {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal);
+    color: var(--p-gray-800);
+    line-height: var(--p-font-line-height-normal);
+    cursor: pointer;
+}
+
+.radio-group {
+    display: flex;
+    align-items: center;
+    gap: var(--p-spacing-4);
+    padding-top: var(--p-spacing-1);
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    gap: var(--p-spacing-2);
+}
+
+.radio-option__label {
+    font-size: var(--p-font-size-sm);
+    color: var(--p-gray-800);
+    cursor: pointer;
+}

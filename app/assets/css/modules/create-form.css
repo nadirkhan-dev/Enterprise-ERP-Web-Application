@@ -1,0 +1,269 @@
+/* Create Page — Profile Layout */
+
+.create-profile-wrapper {
+    position: relative;
+    padding-top: 64px;
+
+    @media (min-width: 768px) {
+        padding-top: 80px;
+    }
+}
+
+/* Declares --profile-avatar-size (the same contract ProfileCard uses) so the
+   placeholder glyph inside scales with the circle instead of falling back to the
+   150px default and looking oversized on mobile. */
+.create-profile-avatar {
+    --profile-avatar-size: calc(var(--p-spacing-px) * 120);
+
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: var(--profile-avatar-size);
+    height: var(--profile-avatar-size);
+    border-radius: 50%;
+    background: var(--p-surface-0);
+    border: 3px solid var(--p-surface-100);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    z-index: 1;
+
+    @media (min-width: 768px) {
+        --profile-avatar-size: calc(var(--p-spacing-px) * 150);
+
+        border-width: 4px;
+    }
+}
+
+.create-profile-card {
+    background: var(--p-surface-0);
+    border-radius: var(--p-border-radius-sm);
+    box-shadow: var(--p-shadow-sm);
+    padding: 80px var(--p-spacing-4) var(--p-spacing-4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--p-spacing-4);
+
+    @media (min-width: 768px) {
+        border-radius: var(--p-border-radius-xs);
+        padding: 100px var(--p-spacing-6) var(--p-spacing-6);
+        gap: var(--p-spacing-6);
+    }
+}
+
+.create-profile-identity {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--p-spacing-3);
+
+    @media (min-width: 768px) {
+        gap: var(--p-spacing-4);
+    }
+}
+
+.create-profile-identity__name {
+    font-size: var(--p-font-size-lg);
+    font-weight: var(--p-font-weight-bold);
+    color: var(--p-deepblue-900);
+    text-align: center;
+
+    @media (min-width: 768px) {
+        font-size: var(--p-font-size-base);
+    }
+}
+
+/* Create Page — Form Sections */
+
+.create-form-section {
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-spacing-3);
+
+    @media (min-width: 768px) {
+        max-width: 674px;
+    }
+}
+
+.create-form-section .p-divider-horizontal::before {
+    border-color: var(--p-surface-200);
+}
+
+.create-form-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-spacing-3);
+}
+
+/* Paired fields (Company Name + Customer Group, First + Last Name, …). On mobile
+   each field takes the full width on its own row — a 50/47 split leaves them too
+   narrow to read or type in, and it's the layout the Step 2 review panel already
+   uses. The pair sits side by side from tablet up. */
+.create-form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--p-spacing-3);
+    align-items: flex-start;
+
+    @media (min-width: 768px) {
+        display: flex;
+        gap: var(--p-spacing-6);
+    }
+}
+
+.create-form-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--p-spacing-3);
+    align-items: flex-start;
+
+    @media (min-width: 768px) {
+        display: flex;
+        gap: var(--p-spacing-6);
+    }
+}
+
+.create-form-row > * {
+    flex: 1;
+    min-width: 0;
+}
+
+.create-form-row--desktop {
+    display: none;
+
+    @media (min-width: 768px) {
+        display: flex;
+    }
+}
+
+.create-form-row--mobile {
+    display: grid;
+
+    @media (min-width: 768px) {
+        display: none;
+    }
+}
+
+.create-form-row--full {
+    grid-template-columns: 1fr;
+}
+
+.customer-create-page .customer-create-back.base-back-button {
+    display: none !important;
+
+    @media (min-width: 768px) {
+        display: inline-flex !important;
+    }
+}
+
+.create-phone-row {
+    gap: var(--p-spacing-3);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    @media (min-width: 768px) {
+        grid-template-columns: 61% 37.2%;
+        gap: var(--p-spacing-3);
+    }
+}
+
+.create-form-row .create-phone-row {
+    grid-column: 1 / -1;
+
+    @media (min-width: 768px) {
+        grid-column: auto;
+    }
+}
+
+.create-form-row--phone-controls {
+    grid-template-columns: 1fr;
+}
+
+.create-checkbox-align {
+    display: flex;
+    align-items: center;
+    align-self: flex-start;
+    padding-bottom: 0;
+    margin-top: var(--p-spacing-2);
+}
+
+.create-radio-group {
+    display: flex;
+    gap: var(--p-spacing-5);
+    align-items: center;
+    height: auto;
+    flex-wrap: wrap;
+    row-gap: var(--p-spacing-2);
+    margin-top: var(--p-spacing-1);
+}
+
+.create-form-row--phone-controls .create-checkbox-align {
+    height: 32px;
+    padding-bottom: 0;
+}
+
+@media (min-width: 768px) {
+    .customer-create-page .customer-create-back.base-back-button {
+        display: inline-flex !important;
+    }
+
+    .create-profile-wrapper {
+        padding-top: 80px;
+    }
+
+    .create-profile-card {
+        border-radius: var(--p-border-radius-xs);
+        padding: 100px var(--p-spacing-6) var(--p-spacing-6);
+        gap: var(--p-spacing-6);
+    }
+
+    .create-profile-identity {
+        gap: var(--p-spacing-4);
+    }
+
+    .create-profile-identity__name {
+        font-size: var(--p-font-size-base);
+    }
+
+    .create-form-section {
+        max-width: 674px;
+    }
+
+    .create-form-row {
+        display: flex;
+        gap: var(--p-spacing-6);
+    }
+
+    .create-form-row--desktop {
+        display: flex;
+    }
+
+    .create-form-row--mobile {
+        display: none;
+    }
+
+    .create-radio-group {
+        flex-wrap: nowrap;
+        height: 32px;
+    }
+
+    .create-phone-row {
+        grid-template-columns: 61% 35%;
+        gap: var(--p-spacing-3);
+    }
+
+    .create-form-row .create-phone-row {
+        grid-column: auto;
+    }
+
+    .create-checkbox-align {
+        align-self: flex-end;
+        padding-bottom: var(--p-spacing-2);
+        margin-top: 0;
+    }
+}

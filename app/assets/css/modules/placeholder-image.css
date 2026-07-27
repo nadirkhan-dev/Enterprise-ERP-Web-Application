@@ -1,0 +1,95 @@
+/* Placeholder images — shown wherever a record has no logo/photo yet.
+ *
+ * Two shapes, both drawn around <BasePlaceholderIcon>, which paints the record's
+ * CATEGORY icon — the sidebar's own icon for that section — so a table row and its
+ * detail page read as the same thing.
+ *
+ *   .placeholder-avatar__icon — the round profile avatar (ProfileCard, drawers).
+ *                               Container stays page-local: it also hosts the real
+ *                               <img> and the upload spinner.
+ *   .placeholder-thumb        — the 5:4 table-row thumbnail, container included.
+ *                               Add --empty when there is no image to show.
+ *
+ * Each icon class declares its size ONCE as --placeholder-icon-size, then spends it
+ * on both width/height and font-size: the two icon systems size off different
+ * properties — an inline Material <svg> off width/height, a PrimeIcons glyph off
+ * font-size — and this way neither rule has to know which one it got. (width/height
+ * are inert on the inline <i>, so there is no cross-talk.)
+ */
+
+/* ── Round profile avatar ────────────────────────────────────────────────── */
+
+/* 60px glyph inside the 150px circle. Sized off ProfileCard's --profile-avatar-size
+   rather than a percentage: a percentage would resolve against the container's
+   CONTENT box, so the ring — and the drawer avatar's 16px logo padding — would
+   quietly shrink the glyph. Keyed to the avatar's outer size it stays 40% of the
+   circle everywhere, and still tracks the drop to 120px on mobile. The fallback
+   covers the drawer avatars, which are a fixed 150px and set no such variable. */
+.placeholder-avatar__icon {
+    /* Held in its own variable rather than written inline as a var() fallback: a
+       calc() nested directly inside a fallback fails to parse, which silently voids
+       the whole size and drops the glyph to its intrinsic dimensions. */
+    --placeholder-avatar-fallback-size: calc(var(--p-spacing-px) * 150);
+    --placeholder-icon-size: calc(var(--profile-avatar-size, var(--placeholder-avatar-fallback-size)) * 0.4);
+
+    width: var(--placeholder-icon-size);
+    height: var(--placeholder-icon-size);
+    font-size: var(--placeholder-icon-size);
+    color: var(--p-surface-100);
+}
+
+/* ── Table-row thumbnail ─────────────────────────────────────────────────── */
+
+/* With an image: white plate + hairline ring, so a logo on white still reads as
+   a distinct tile. */
+.placeholder-thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: calc(var(--p-spacing-px) * 30);
+    aspect-ratio: 5 / 4;
+    border-radius: var(--p-border-radius-xs);
+    background: var(--p-surface-0);
+    border: 1px solid var(--p-surface-200);
+    overflow: hidden;
+}
+
+/* Without an image: the tinted plate IS the affordance, so the ring comes off —
+   otherwise every logo-less row reads as an empty framed box. */
+.placeholder-thumb--empty {
+    background: var(--p-surface-50);
+    border: none;
+}
+
+.placeholder-thumb__img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.placeholder-thumb__icon {
+    --placeholder-icon-size: var(--p-spacing-4);
+
+    width: var(--placeholder-icon-size);
+    height: var(--placeholder-icon-size);
+    font-size: var(--placeholder-icon-size);
+    color: var(--p-surface-200);
+}
+
+/* ── PrimeIcons size guard ───────────────────────────────────────────────── */
+
+/* A PrimeIcons glyph sizes off font-size, and two other rules fight us for it:
+   PrimeIcons' own `.pi { font-size: 1rem }` (one class, injected after this sheet, so
+   it wins a tie), and — worse — ProfileCard's blanket `:deep(.pi) { font-size: 12px }`,
+   which compiles to `[data-v-…] .pi` and so rakes in every PrimeIcon inside the card,
+   the slotted avatar included. That one is two-specificity, so beating it needs three:
+   hence the extra .placeholder-icon class that BasePlaceholderIcon always stamps on.
+
+   The Material <svg> icons size off width/height, which nothing else touches — which
+   is exactly why only the PrimeIcons categories (supplier, customer) came out small
+   while items and manufacturers looked right. */
+.placeholder-icon.placeholder-avatar__icon.pi,
+.placeholder-icon.placeholder-thumb__icon.pi {
+    font-size: var(--placeholder-icon-size);
+}

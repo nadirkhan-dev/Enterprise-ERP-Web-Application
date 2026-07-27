@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__looker__get_dashboards",
+      "mcp__looker__get_models",
+      "mcp__looker__run_dashboard",
+      "mcp__looker__get_explores",
+      "mcp__looker__get_dimensions",
+      "mcp__looker__get_measures",
+      "mcp__looker__get_looks",
+      "mcp__looker__query",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:community.directus.io)"
+    ]
+  }
+}

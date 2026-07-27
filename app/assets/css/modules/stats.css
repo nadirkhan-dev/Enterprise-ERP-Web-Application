@@ -1,0 +1,64 @@
+.stats-row {
+    display: flex;
+    gap: var(--p-spacing-4);
+}
+
+.stats-card {
+    flex: 1;
+    background: var(--p-surface-0);
+    border-radius: var(--p-border-radius-xs);
+    box-shadow: var(--p-shadow-sm);
+    padding: clamp(var(--p-spacing-6), 2vw, var(--p-spacing-8));
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--p-spacing-4);
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: var(--p-spacing-2);
+}
+
+.stat-label {
+    font-size: var(--p-font-size-sm);
+    color: var(--p-text-muted-color);
+}
+
+.stat-value {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-bold);
+    color: var(--p-deepblue-900);
+}
+
+.standing-good,
+.standing-bad {
+    font-size: var(--p-font-size-lg);
+    font-weight: var(--p-font-weight-bold);
+    line-height: var(--p-font-line-height-snug);
+    letter-spacing: 0;
+    font-feature-settings: 'liga' off, 'clig' off;
+    display: flex;
+    align-items: center;
+    gap: var(--p-spacing-2);
+}
+
+.standing-good {
+    color: var(--p-vividgreen-500);
+}
+
+.standing-bad {
+    color: var(--p-red-500);
+}
+
+.standing-good .pi,
+.standing-bad .pi {
+    width: var(--p-spacing-3);
+    height: var(--p-spacing-3);
+    font-size: var(--p-font-size-xs);
+}

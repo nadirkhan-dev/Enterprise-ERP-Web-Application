@@ -1,0 +1,290 @@
+name: Deploy to Development
+on:
+  push:
+    branches:
+      - dev
+concurrency:
+  group: deploy-development
+  cancel-in-progress: false
+permissions:
+  contents: write       # checkout + push the version-bump commit back to dev
+  packages: write       # push Docker image to ghcr.io
+  pull-requests: read   # gh pr list for release-notes.json
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: development
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      # Decide the bump type from commits since the last bump:
+      #   any "feat: ..." -> minor (1.x.0)
+      #   otherwise       -> patch (1.x.y)
+      # Major bumps are NEVER applied automatically — they are done manually.
+      # The new version is written to package.json *before* the Docker build so it
+      # gets baked into the image; the commit is pushed back to dev after a
+      # successful deploy (with [skip ci] to avoid retriggering this workflow).
+      - name: Determine and apply version bump
+        run: |
+          PREV_BUMP_SHA=$(git log --format='%H %s' | grep -m 1 'chore: bump version to' | cut -d' ' -f1)
+          if [ -z "$PREV_BUMP_SHA" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${PREV_BUMP_SHA}..HEAD"
+          fi
+
+          BUMP_TYPE="patch"
+          if git log --format=%s "$RANGE" | grep -qE "^feat: "; then
+            BUMP_TYPE="minor"
+          fi
+
+          CURRENT=$(grep -o '"version": *"[^"]*"' package.json | head -1 | cut -d'"' -f4)
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT" | cut -d. -f3)
+
+          if [ "$BUMP_TYPE" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "PREVIOUS_VERSION=${CURRENT}" >> "$GITHUB_ENV"
+          echo "BUMP_TYPE=${BUMP_TYPE}" >> "$GITHUB_ENV"
+          echo "NEW_PACKAGE_VERSION=${NEW_VERSION}" >> "$GITHUB_ENV"
+
+          # Replace only the first "version": "..." occurrence (the top-level package field)
+          sed -i '0,/"version": *"[^"]*"/{s//"version": "'"$NEW_VERSION"'"/;}' package.json
+
+          echo "Version: ${CURRENT} -> ${NEW_VERSION} (${BUMP_TYPE})"
+      # Write version.json before the Docker build so it gets baked into the image.
+      # The composable compares this ID against the running app's ID to detect new deployments.
+      - name: Extract version and write version.json
+        run: |
+          VERSION=$(grep -o '"version": *"[^"]*"' package.json | head -1 | cut -d'"' -f4)
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "{\"id\":\"${{ github.sha }}\",\"version\":\"${VERSION}\"}" > public/version.json
+
+      - name: Generate release-notes.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr list --base dev --state merged --limit 15 \
+            --json mergeCommit,body,mergedAt \
+            --jq '
+              [ .[] | select(.body | test("## Changes")) |
+                {
+                  version: .mergeCommit.oid,
+                  merged: .mergedAt,
+                  changes: [
+                    .body
+                    | split("## Changes")[1]
+                    | split("## ")[0]
+                    | split("\n")[]
+                    | select(test("^\\s*- ."))
+                    | ltrimstr(" ") | ltrimstr("- ")
+                    | gsub("\\r"; "")
+                    | select(length > 0)
+                  ]
+                }
+              | select(.changes | length > 0)
+              ]
+            ' > public/release-notes.json || echo "[]" > public/release-notes.json
+
+          # Label each PR's notes with the version that SHIPPED its changes — i.e.
+          # the bump applied AFTER the PR merged — NOT the version live at merge time
+          # (git show <mergeSHA>:package.json), which is the PREVIOUS release and left
+          # every entry off by one. The newest PR ships in this deploy's ${VERSION};
+          # each older PR ships in the version that was live when the next-newer PR
+          # merged. So walk newest→oldest, assigning each entry the version carried
+          # over from the previous (newer) iteration.
+          SHIP_VERSION="${VERSION}"
+          for SHA in $(grep -o '"version":"[a-f0-9]\{40\}"' public/release-notes.json | cut -d'"' -f4); do
+            if [ -n "$SHIP_VERSION" ]; then
+              sed -i "s|${SHA}|${SHIP_VERSION}|" public/release-notes.json
+            fi
+            # The version live at THIS PR's merge is what the NEXT (older) PR shipped in.
+            SHIP_VERSION=$(git show "${SHA}:package.json" 2>/dev/null | grep -o '"version": *"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+          done
+
+      - name: Log in to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+          docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Debug - check secrets presence
+        run: |
+          echo "DIRECTUS_URL length: ${#DIRECTUS_URL_VAL}"
+          echo "DIRECTUS_WEBSOCKET_URL length: ${#DIRECTUS_WEBSOCKET_URL_VAL}"
+          if [ -z "$DIRECTUS_WEBSOCKET_URL_VAL" ]; then
+            echo "DIRECTUS_WEBSOCKET_URL secret is EMPTY or NOT AVAILABLE"
+          else
+            echo "DIRECTUS_WEBSOCKET_URL secret is present"
+          fi
+          # An empty reset URL is not fatal, but it silently sends password-reset
+          # emails to Directus's own URL (SupplyHub) — so say so, loudly.
+          if [ -z "$PASSWORD_RESET_URL_VAL" ]; then
+            echo "::warning::NUXT_PUBLIC_PASSWORD_RESET_URL is EMPTY — reset emails will link to Directus (SupplyHub), not Connect. Set it under Settings > Environments > development (Variables, or Secrets)."
+          else
+            echo "NUXT_PUBLIC_PASSWORD_RESET_URL is present (${#PASSWORD_RESET_URL_VAL} chars)"
+          fi
+        env:
+          DIRECTUS_URL_VAL: ${{ secrets.DIRECTUS_URL }}
+          DIRECTUS_WEBSOCKET_URL_VAL: ${{ secrets.DIRECTUS_WEBSOCKET_URL }}
+          PASSWORD_RESET_URL_VAL: ${{ vars.NUXT_PUBLIC_PASSWORD_RESET_URL || secrets.NUXT_PUBLIC_PASSWORD_RESET_URL }}
+
+      - name: Build Docker image
+        env:
+          DIRECTUS_URL_VAL: ${{ secrets.DIRECTUS_URL }}
+          DIRECTUS_WEBSOCKET_URL_VAL: ${{ secrets.DIRECTUS_WEBSOCKET_URL }}
+          SQUARE_APPLICATION_ID_VAL: ${{ secrets.NUXT_PUBLIC_SQUARE_APPLICATION_ID }}
+          SQUARE_LOCATION_ID_VAL: ${{ secrets.NUXT_PUBLIC_SQUARE_LOCATION_ID }}
+          TURNSTILE_SITE_KEY_VAL: ${{ secrets.NUXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          SERVICEMASTER_WS_URL_VAL: ${{ secrets.NUXT_PUBLIC_SERVICEMASTER_WS_URL }}
+          SERVICEMASTER_TOKEN_VAL: ${{ secrets.NUXT_PUBLIC_SERVICEMASTER_TOKEN }}
+          # Accept it from either store: it belongs in Variables (it's a URL, not a
+          # secret), but every other value here is a Secret, so fall back to that
+          # rather than silently building with an empty reset URL.
+          PASSWORD_RESET_URL_VAL: ${{ vars.NUXT_PUBLIC_PASSWORD_RESET_URL || secrets.NUXT_PUBLIC_PASSWORD_RESET_URL }}
+        run: |
+          docker build \
+            --build-arg "DIRECTUS_URL=${DIRECTUS_URL_VAL}" \
+            --build-arg "NUXT_PUBLIC_DIRECTUS_WEBSOCKET_URL=${DIRECTUS_WEBSOCKET_URL_VAL}" \
+            --build-arg "NUXT_PUBLIC_SQUARE_APPLICATION_ID=${SQUARE_APPLICATION_ID_VAL}" \
+            --build-arg "NUXT_PUBLIC_SQUARE_LOCATION_ID=${SQUARE_LOCATION_ID_VAL}" \
+            --build-arg "NUXT_PUBLIC_TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY_VAL}" \
+            --build-arg "NUXT_PUBLIC_SERVICEMASTER_WS_URL=${SERVICEMASTER_WS_URL_VAL}" \
+            --build-arg "NUXT_PUBLIC_SERVICEMASTER_TOKEN=${SERVICEMASTER_TOKEN_VAL}" \
+            --build-arg "NUXT_PUBLIC_PASSWORD_RESET_URL=${PASSWORD_RESET_URL_VAL}" \
+            -t ghcr.io/libertysupply/connect:dev \
+            -t ghcr.io/libertysupply/connect:${{ github.sha }} \
+            .
+      - name: Push Docker image
+        run: |
+          docker push ghcr.io/libertysupply/connect:dev
+          docker push ghcr.io/libertysupply/connect:${{ github.sha }}
+      - name: Setup compose file
+        run: |
+          mkdir -p /opt/stacks/connect
+          cp docker/compose.yaml /opt/stacks/connect/compose.yaml
+      - name: Deploy
+        id: deploy
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          NUXT_LOOKER_BASE_URL: ${{ secrets.NUXT_LOOKER_BASE_URL }}
+          NUXT_LOOKER_CLIENT_ID: ${{ secrets.NUXT_LOOKER_CLIENT_ID }}
+          NUXT_LOOKER_CLIENT_SECRET: ${{ secrets.NUXT_LOOKER_CLIENT_SECRET }}
+          NUXT_SAP_SERVICE_LAYER_URL: ${{ secrets.NUXT_SAP_SERVICE_LAYER_URL }}
+          NUXT_SAP_COMPANY_DB: ${{ secrets.NUXT_SAP_COMPANY_DB }}
+          NUXT_SAP_USERNAME: ${{ secrets.NUXT_SAP_USERNAME }}
+          NUXT_SAP_PASSWORD: ${{ secrets.NUXT_SAP_PASSWORD }}
+          NUXT_SAP_ALLOW_SELF_SIGNED_CERT: ${{ secrets.NUXT_SAP_ALLOW_SELF_SIGNED_CERT }}
+          DIRECTUS_URL: ${{ secrets.DIRECTUS_URL }}
+          NUXT_DIRECTUS_TOKEN: ${{ secrets.DIRECTUS_TOKEN }}
+          NUXT_FEDEX_API_KEY: ${{ secrets.NUXT_FEDEX_API_KEY }}
+          NUXT_FEDEX_SECRET_KEY: ${{ secrets.NUXT_FEDEX_SECRET_KEY }}
+          NUXT_FEDEX_SHIPPER_ACCOUNT: ${{ secrets.NUXT_FEDEX_SHIPPER_ACCOUNT }}
+          NUXT_FEDEX_ACCOUNT: ${{ secrets.NUXT_FEDEX_ACCOUNT }}
+          NUXT_FEDEX_BILL_TO_ACCOUNT: ${{ secrets.NUXT_FEDEX_BILL_TO_ACCOUNT }}
+          NUXT_FEDEX_ENV: ${{ secrets.NUXT_FEDEX_ENV }}
+          NUXT_UPS_CLIENT_ID: ${{ secrets.NUXT_UPS_CLIENT_ID }}
+          NUXT_UPS_CLIENT_SECRET: ${{ secrets.NUXT_UPS_CLIENT_SECRET }}
+          NUXT_UPS_SHIPPER_NUMBER: ${{ secrets.NUXT_UPS_SHIPPER_NUMBER }}
+          NUXT_UPS_ENV: ${{ secrets.NUXT_UPS_ENV }}
+          NUXT_SQUARE_ACCESS_TOKEN: ${{ secrets.NUXT_SQUARE_ACCESS_TOKEN }}
+          NUXT_PDF_DOWNLOAD_SERVICE_URL: ${{ secrets.PDF_DOWNLOAD_SERVICE_URL }}
+          NUXT_PDF_DOWNLOAD_SERVICE_USER_NAME: ${{ secrets.PDF_DOWNLOAD_SERVICE_USER_NAME }}
+          NUXT_PDF_DOWNLOAD_SERVICE_USER_PASS: ${{ secrets.PDF_DOWNLOAD_SERVICE_USER_PASS }}
+          NUXT_TURNSTILE_SECRET_KEY: ${{ secrets.NUXT_TURNSTILE_SECRET_KEY }}
+          NUXT_MS_FORM_RESPONSES_URL: ${{ secrets.NUXT_MS_FORM_RESPONSES_URL }}
+          NUXT_SERVICEMASTER_WS_URL: ${{ secrets.NUXT_SERVICEMASTER_WS_URL }}
+          NUXT_SERVICEMASTER_API_KEY: ${{ secrets.NUXT_SERVICEMASTER_API_KEY }}
+          NUXT_CF_ACCESS_CLIENT_ID: ${{ secrets.NUXT_CF_ACCESS_CLIENT_ID }}
+          NUXT_CF_ACCESS_CLIENT_SECRET: ${{ secrets.NUXT_CF_ACCESS_CLIENT_SECRET }}
+          NUXT_PUBLIC_PASSWORD_RESET_URL: ${{ vars.NUXT_PUBLIC_PASSWORD_RESET_URL || secrets.NUXT_PUBLIC_PASSWORD_RESET_URL }}
+        run: |
+          cd /opt/stacks/connect
+          docker compose pull
+          docker compose up -d --force-recreate
+      - name: Health check
+        run: |
+          echo "Waiting for server to start..."
+          for i in $(seq 1 10); do
+            if curl -sf http://localhost:5175 > /dev/null 2>&1; then
+              echo "Health check passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i/10 failed — retrying in 3s..."
+            sleep 3
+          done
+          echo "Health check failed after 10 attempts"
+          exit 1
+      # The containers are recreated and the local health check passes, but the
+      # app isn't always reachable through Cloudflare yet — clients that refresh
+      # immediately can briefly hit a Cloudflare error page. Give the edge a few
+      # seconds to settle before broadcasting "new version available". Runs on the
+      # success path only, so the notification is still sent only after a
+      # successful deployment.
+      - name: Wait for app to be reachable before notifying clients
+        if: success()
+        run: sleep 10
+      - name: Notify frontend of new deploy
+        if: success()
+        run: |
+          curl -sf -X POST http://localhost:5175/api/deploy \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}" \
+            -d '{
+              "version": "${{ env.VERSION }}",
+              "env": "dev"
+            }'
+
+      # Commit the bumped package.json back to dev only after a successful
+      # deploy. [skip ci] prevents this push from re-triggering the workflow.
+      # Rebases against the latest dev before pushing in case another commit
+      # landed during the build/deploy window — the bump only touches one line
+      # of package.json so the rebase is nearly always clean.
+      - name: Commit version bump back to dev
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          if git diff --cached --quiet; then
+            echo "No version change to commit"
+            exit 0
+          fi
+          git commit -m "chore: bump version to ${NEW_PACKAGE_VERSION} [skip ci]"
+
+          # Up to 3 attempts: fetch latest dev, rebase, push. Retries cover the
+          # case where a third commit lands between fetch and push.
+          for attempt in 1 2 3; do
+            git fetch origin dev
+            if ! git rebase origin/dev; then
+              git rebase --abort
+              echo "Rebase conflict on attempt ${attempt} — skipping version-bump push (next deploy will retry)"
+              exit 0
+            fi
+            if git push origin HEAD:dev; then
+              echo "Pushed version bump on attempt ${attempt}"
+              exit 0
+            fi
+            echo "Push rejected on attempt ${attempt} — refetching and retrying"
+          done
+
+          echo "All 3 push attempts failed — leaving version bump uncommitted (next deploy will retry)"
+          exit 0
+
+      - name: Rollback on failure
+        if: failure() && steps.deploy.outcome == 'success'
+        run: |
+            echo "Rolling back to previous image..."
+            docker pull ghcr.io/libertysupply/connect:${{ github.event.before }} || true
+            cd /opt/stacks/connect
+            docker compose up -d --force-recreate
+            echo "Rollback complete"

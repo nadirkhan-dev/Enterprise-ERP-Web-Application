@@ -1,0 +1,848 @@
+/* Skeleton placeholders share .skeleton-block animation */
+:deep(.skeleton-line) {
+    display: inline-block;
+    height: var(--p-font-size-sm);
+    border-radius: 0;
+}
+
+/* Keep inventory column headers on a single line. Pairs with `min-width` on
+   each Column + `:table-style="{ minWidth: '100%' }"`: on mobile the table
+   exceeds the viewport and scrolls horizontally instead of wrapping headers. */
+:deep(.p-datatable-thead .p-datatable-column-title) {
+    white-space: nowrap;
+}
+
+.moq-header {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--p-spacing-1);
+}
+
+.moq-header__icon {
+    color: var(--p-tideblue-400);
+    font-size: var(--p-font-size-xs);
+    cursor: pointer;
+}
+
+:deep(.skeleton-line--value) {
+    width: 40%;
+    min-width: var(--p-spacing-10);
+    height: var(--p-font-size-sm);
+}
+
+/* Dropdown inputs container — below price with arrow pointing up */
+:deep(.price-stat__dropdown-inputs) {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    background: var(--p-primary-50) !important;
+    padding: 10px !important;
+    border-radius: var(--p-border-radius-xs, 2px) !important;
+    position: absolute !important;
+    top: 100% !important;
+    left: 0 !important;
+    z-index: 50 !important;
+    margin-top: var(--p-spacing-2) !important;
+    box-sizing: border-box !important;
+    box-shadow: var(--p-shadow-lg) !important;
+    pointer-events: auto !important;
+
+    @media (min-width: 768px) {
+        margin-top: calc(-1 * var(--p-spacing-1)) !important;
+    }
+
+    @media (min-width: 1024px) {
+        margin-top: 0 !important;
+    }
+}
+
+:deep(.price-stat__dropdown-row) {
+    display: flex;
+    align-items: center;
+    gap: var(--p-spacing-2);
+    width: 100%;
+}
+
+/* Arrow pointing up from dropdown to price */
+:deep(.price-stat__dropdown-inputs::before) {
+    content: '' !important;
+    position: absolute !important;
+    top: calc(-1 * 8px) !important;
+    left: calc(var(--p-spacing-6) / 2 - 8px) !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-left: 8px solid transparent !important;
+    border-right: 8px solid transparent !important;
+    border-bottom: 8px solid var(--p-primary-50) !important;
+    z-index: 1 !important;
+}
+
+/* Offer Price (2nd card, right grid column) on mobile: a left-anchored dropdown
+   runs off the right of the screen. Anchor it to the right edge so it opens
+   inward (leftward). From tablet up the panel is a flex row with room, so
+   revert to the default left-anchored open. */
+.price-stats > .price-stat:nth-child(2) :deep(.price-stat__dropdown-inputs) {
+    left: auto !important;
+    right: 0 !important;
+
+    @media (min-width: 768px) {
+        left: 0 !important;
+        right: auto !important;
+    }
+}
+
+/* The box-attached arrow would sit at the box's left edge (off under the left
+   column). Hide it on mobile and pin a replacement arrow under the calculator
+   icon instead — see the ::after below. Restore the box arrow from tablet up. */
+.price-stats > .price-stat:nth-child(2) :deep(.price-stat__dropdown-inputs::before) {
+    display: none !important;
+
+    @media (min-width: 768px) {
+        display: block !important;
+    }
+}
+
+/* Decoupled arrow pinned under the calculator icon (price-stat left edge),
+   independent of the right-anchored box width so it always lines up with the
+   icon. Only rendered while the dropdown is open, mobile only. */
+.price-stats :deep(.price-stat:nth-child(2).price-stat--dropdown-open)::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: calc(var(--p-spacing-6) / 2 - 8px);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid var(--p-primary-50);
+    z-index: 51;
+
+    @media (min-width: 768px) {
+        display: none;
+    }
+}
+
+/* Dropdown expand/collapse transition */
+.dropdown-expand-enter-active,
+.dropdown-expand-leave-active {
+    transition: opacity var(--p-transition-duration) ease,
+                transform var(--p-transition-duration) ease;
+}
+
+.dropdown-expand-enter-from {
+    opacity: 0;
+    transform: scaleY(0.95) translateY(-8px);
+}
+
+.dropdown-expand-leave-to {
+    opacity: 0;
+    transform: scaleY(0.95) translateY(-8px);
+}
+
+/* Mobile-first: 2-column grid; editor flows inline as full-width row */
+.price-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--p-spacing-4);
+    padding-bottom: var(--p-spacing-6);
+    position: relative;
+
+    @media (min-width: 768px) {
+        display: flex;
+        align-items: stretch;
+        gap: var(--p-spacing-4);
+    }
+
+    /* Wider columns at laptop+ have room for the roomier gap; tablet keeps the
+       smaller gap so the Gross Margin value doesn't wrap to a second line. */
+    @media (min-width: 1024px) {
+        gap: var(--p-spacing-8);
+    }
+}
+
+.price-stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-spacing-2);
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+    overflow: visible !important;
+
+    @media (min-width: 768px) {
+        flex: 1 1 0;
+    }
+}
+
+.price-stat--dropdown-open {
+    z-index: 20;
+}
+
+/* Source order: BaseCost, OfferPrice, GrossMargin, MfrListPrice, Editor.
+   Mobile grid slots: editor at order 3 or 6 so it lands between rows. */
+.price-stats > .price-stat:nth-child(1) { order: 1; }
+.price-stats > .price-stat:nth-child(2) { order: 2; }
+.price-stats > .price-stat:nth-child(3) { order: 4; }
+.price-stats > .price-stat:nth-child(4) { order: 5; }
+
+:deep(.price-stat__label) {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-medium);
+    color: var(--p-gray-800);
+}
+
+:deep(.price-stat__header) {
+    display: flex;
+    align-items: baseline;
+    gap: var(--p-spacing-2);
+    flex-wrap: wrap;
+}
+
+:deep(.price-stat__original) {
+    font-size: var(--p-font-size-sm);
+    color: var(--p-gray-800);
+}
+
+:deep(.price-stat__value) {
+    font-family: var(--p-font-family);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal);
+    line-height: var(--p-spacing-5);
+    letter-spacing: var(--p-font-letter-spacing-normal);
+    color: var(--p-deepblue-900);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--p-spacing-1);
+    font-feature-settings: 'liga' off, 'clig' off;
+    @media (min-width: 1024px) {
+        min-height: calc(var(--p-spacing-8) + 2px);
+    }
+}
+
+:deep(.price-stat__value--calculator) {
+    font-weight: var(--p-font-weight-medium);
+}
+
+
+
+.price-stat__editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-spacing-1.75);
+    background: var(--p-surface-0);
+    border: 1px solid var(--p-surface-200);
+    border-radius: var(--p-border-radius-lg);
+    padding: var(--p-spacing-2);
+    box-shadow: var(--p-shadow-lg);
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 10;
+
+    @media (min-width: 1024px) {
+        display: none;
+    }
+}
+
+.price-stat__editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.price-stat__editor-label {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-bold);
+    color: var(--p-deepblue-900);
+}
+
+.price-stat__editor-inputs {
+    display: flex;
+    align-items: center;
+    gap: var(--p-spacing-1.75);
+    flex-wrap: nowrap;
+    background: var(--p-primary-50);
+    padding: var(--p-spacing-2);
+    border-radius: var(--p-border-radius-lg);
+
+    @media (min-width: 768px) {
+        gap: var(--p-spacing-2);
+        flex-wrap: nowrap;
+    }
+}
+
+.editor-slide-enter-active,
+.editor-slide-leave-active {
+    transition: opacity var(--p-transition-duration) ease,
+                transform var(--p-transition-duration) ease;
+}
+
+.editor-slide-enter-from {
+    opacity: 0;
+    transform: translateY(-8px);
+}
+
+.editor-slide-leave-to {
+    opacity: 0;
+    transform: translateY(-8px);
+}
+
+:deep(.price-stat__close-btn.p-button) {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    width: var(--p-spacing-8);
+    height: var(--p-spacing-8);
+    min-width: var(--p-spacing-8);
+    border-radius: var(--p-border-radius-sm);
+    background: transparent;
+    color: var(--p-primary-500);
+}
+
+/* Hover highlight is sized to the 24px icon-button (like the calculator),
+   centred inside the larger clickable area — the hit area itself is unchanged. */
+:deep(.price-stat__close-btn.p-button::before) {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--p-spacing-6);
+    height: var(--p-spacing-6);
+    transform: translate(-50%, -50%);
+    border-radius: var(--p-border-radius-sm);
+    background: transparent;
+    transition: background var(--p-transition-duration-normal) var(--p-transition-timing-ease-out);
+    pointer-events: none;
+}
+
+:deep(.price-stat__close-btn.p-button:not(:disabled):hover::before),
+:deep(.price-stat__close-btn.p-button:not(:disabled):focus-visible::before) {
+    background: var(--p-tideblue-50);
+}
+
+:deep(.price-stat__close-btn.p-button .p-button-icon) {
+    position: relative;
+    z-index: 1;
+    font-size: var(--p-font-size-sm);
+    line-height: 1;
+}
+
+/* Shared input styling for both inputs.
+   font-size uses !important to override the global iOS-zoom-prevention rule in
+   main.css that forces 16px on mobile — this editor is intentionally compact
+   and must match the .price-stat__value display (14px) sitting next to it. */
+:deep(.price-stat__editor .p-inputnumber-input),
+:deep(.price-stat__editor-inline .p-inputnumber-input) {
+    border: none;
+    box-shadow: none;
+    font-family: var(--p-font-family);
+    font-size: var(--p-font-size-sm) !important;
+    font-weight: var(--p-font-weight-normal) !important;
+    line-height: var(--p-spacing-5);
+    letter-spacing: var(--p-font-letter-spacing-normal);
+    color: var(--p-gray-500);
+    height: var(--p-spacing-6);
+    font-feature-settings: 'liga' off, 'clig' off;
+}
+
+/* Dollar input group [ $ | 143.04 ] */
+:deep(.price-stat__dollar-group) {
+    flex: 0 0 auto;
+    width: auto;
+    border: 1px solid var(--p-surface-300);
+    border-radius: var(--p-border-radius-lg);
+    overflow: hidden;
+    outline: none;
+    box-shadow: none;
+}
+
+:deep(.price-stat__dollar-group:focus-within) {
+    border-color: var(--p-primary-500);
+    box-shadow: none;
+    outline: none;
+}
+
+:deep(.price-stat__dollar-group .p-inputnumber-input) {
+    border: none;
+    box-shadow: none;
+    outline: none;
+}
+
+:deep(.price-stat__dollar-group .p-inputgroupaddon) {
+    color: var(--p-deepblue-900);
+    font-weight: var(--p-font-weight-bold);
+    font-size: var(--p-font-size-xs);
+    padding: 0 var(--p-spacing-2);
+    min-width: auto;
+    background: var(--p-surface-0);
+    border: none;
+    border-right: 1px solid var(--p-surface-300);
+}
+
+:deep(.price-stat__dollar-icon) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 9.2px;
+    height: 14px;
+    color: var(--p-deepblue-900);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-black);
+    line-height: 1;
+}
+
+:deep(.price-stat__dollar-group .p-inputnumber) {
+    flex: 0 0 auto;
+}
+
+:deep(.price-stat__dollar-group .p-inputnumber-input) {
+    border-radius: 0;
+    width: 64px;
+    padding: 0;
+    text-align: center;
+    color: var(--p-gray-800);
+    font-weight: var(--p-font-weight-normal) !important;
+}
+
+:deep(.price-stat__editor .price-stat__dollar-group) {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    height: calc(var(--p-spacing-8) + 2px);
+    box-sizing: border-box;
+    align-items: stretch;
+}
+
+:deep(.price-stat__editor .price-stat__dollar-group .p-inputnumber) {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+:deep(.price-stat__editor .price-stat__dollar-group .p-inputnumber),
+:deep(.price-stat__editor .price-stat__dollar-group .p-inputnumber-input) {
+    height: 100%;
+    box-sizing: border-box;
+}
+
+:deep(.price-stat__editor .price-stat__dollar-group .p-inputnumber-input) {
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+    padding: 0 var(--p-spacing-2);
+    font-family: var(--p-font-family);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal) !important;
+    line-height: var(--p-spacing-5);
+    letter-spacing: var(--p-font-letter-spacing-normal);
+    color: var(--p-gray-800);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-feature-settings: 'liga' off, 'clig' off;
+}
+
+:deep(.price-stat__editor .price-stat__dollar-group .p-inputgroupaddon) {
+    height: 100%;
+    box-sizing: border-box;
+}
+
+/* Percent input [ -20% | ↕ ] */
+:deep(.price-stat__percent-input) {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: stretch;
+    width: 96px;
+    height: calc(var(--p-spacing-6) + 2px);
+    border: 1px solid var(--p-surface-300);
+    border-radius: var(--p-border-radius-lg);
+    overflow: hidden;
+    outline: none;
+    box-shadow: none;
+}
+
+:deep(.price-stat__percent-input:focus-within) {
+    border-color: var(--p-primary-500);
+    box-shadow: none;
+    outline: none;
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-input) {
+    flex: 0 0 64px;
+    color: var(--p-deepblue-900);
+    font-weight: var(--p-font-weight-book) !important;
+    border-radius: 0;
+    width: 64px;
+    min-width: 0;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 0 var(--p-spacing-1);
+    text-align: center;
+    border: none;
+    box-shadow: none;
+    outline: none;
+}
+
+:deep(.price-stat__editor .price-stat__percent-input) {
+    flex: 0 0 120px;
+    width: 120px;
+    min-width: 0;
+    height: calc(var(--p-spacing-8) + 2px);
+}
+
+:deep(.price-stat__editor .price-stat__percent-input .p-inputnumber-input) {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    padding: 0 var(--p-spacing-2);
+    text-align: left;
+}
+
+:deep(.price-stat__editor .price-stat__percent-input .p-inputnumber-button-group) {
+    flex: 0 0 36px;
+    width: 36px;
+}
+
+:deep(.price-stat__editor .price-stat__editor-inputs > .price-stat__percent-input:only-child) {
+    /* Gross Margin has no dollar input — let its lone percent field fill the
+       full-width editor row instead of sitting small on the left. */
+    flex: 1 1 auto;
+    width: auto;
+}
+
+:deep(.price-stat__editor .price-stat__editor-inputs > .price-stat__percent-input:only-child .p-inputnumber-input) {
+    flex: 1 1 auto;
+    width: auto;
+    padding: 0 var(--p-spacing-2);
+    text-align: left;
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-button-group) {
+    /* Override PrimeVue's stacked default (1px inset on each edge) so the
+       button hover background fills the full half — overflow:hidden on the
+       parent clips against the rounded corner. */
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    width: 32px;
+    height: 100%;
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-button-group::before),
+:deep(.price-stat__percent-input .p-inputnumber-button-group::after) {
+    content: '';
+    position: absolute;
+    background: var(--p-surface-300);
+    pointer-events: none;
+    z-index: 1;
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-button-group::before) {
+    top: -1px;
+    bottom: -1px;
+    left: 0;
+    width: 1px;
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-button-group::after) {
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    transform: translateY(-50%);
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-button) {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--p-surface-0);
+    border: none;
+    color: var(--p-surface-400);
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    line-height: 1;
+    min-height: 0;
+    min-width: auto;
+    box-sizing: border-box;
+}
+
+/* Absolute centering ignores font-baseline quirks so chevron-up and
+   chevron-down land at identical positions in their respective cells. */
+:deep(.price-stat__percent-input .p-inputnumber-button .p-icon),
+:deep(.price-stat__percent-input .p-inputnumber-button .p-button-icon) {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 8.5px !important;
+    height: 5px !important;
+    font-size: 8.5px !important;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+    color: var(--p-surface-400);
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-button .p-button-icon.pi),
+:deep(.price-stat__percent-input .p-inputnumber-button .p-button-icon.pi::before) {
+    font-size: 8.5px !important;
+    line-height: 1;
+    color: var(--p-surface-400);
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-button .p-button-icon.pi::before) {
+    display: block;
+}
+
+:deep(.price-stat__editor-inline .price-stat__percent-input .p-inputnumber-button .p-icon),
+:deep(.price-stat__editor-inline .price-stat__percent-input .p-inputnumber-button .p-button-icon) {
+    width: 8.5px !important;
+    height: 5px !important;
+    font-size: 8.5px !important;
+    color: var(--p-surface-400);
+}
+
+:deep(.price-stat__editor-inline .price-stat__percent-input .p-inputnumber-button .p-button-icon.pi),
+:deep(.price-stat__editor-inline .price-stat__percent-input .p-inputnumber-button .p-button-icon.pi::before) {
+    font-size: 8.5px !important;
+    color: var(--p-surface-400);
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group) {
+    flex: 0 0 auto;
+    width: auto;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    background: white !important;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputnumber) {
+    background: white !important;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group input) {
+    background: white !important;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputnumber) {
+    flex: 0 0 auto;
+    height: 24px;
+    min-width: 0;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputnumber-input) {
+    width: calc(var(--p-spacing-px) * 92);
+    height: 24px !important;
+    padding: 0 8px !important;
+    flex: 0 0 auto;
+    font-family: var(--p-font-family);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal);
+    line-height: 24px !important;
+    letter-spacing: var(--p-font-letter-spacing-normal);
+    color: var(--p-deepblue-900) !important;
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-feature-settings: 'liga' off, 'clig' off;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputnumber-input:focus,
+.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputnumber-input:focus-visible,
+.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputnumber-input:active) {
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputgroupaddon) {
+    height: 24px !important;
+    width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0 !important;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input) {
+    flex: 0 0 100px;
+    width: 100px;
+    height: 24px;
+    display: flex;
+    align-items: stretch;
+    background: white !important;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber) {
+    background: white !important;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input input) {
+    background: white !important;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber-input) {
+    flex: 1 1 0;
+    width: auto;
+    max-width: 62px;
+    height: 24px !important;
+    padding: 0 8px;
+    font-family: var(--p-font-family);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal) !important;
+    line-height: 24px !important;
+    letter-spacing: var(--p-font-letter-spacing-normal);
+    color: var(--p-deepblue-900) !important;
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    text-align: center;
+    leading-trim: both;
+    text-edge: cap;
+    font-feature-settings: 'liga' off, 'clig' off;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber-input:focus,
+.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber-input:focus-visible,
+.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber-input:active) {
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input:only-child) {
+    flex: 2 1 0;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber-button-group) {
+    flex: 0 0 36px;
+    width: 36px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+    align-items: stretch;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber-button) {
+    flex: 0 0 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--p-surface-0);
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    height: 50%;
+    position: relative;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber-button:hover) {
+    background: var(--p-tideblue-50);
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber-button .p-icon),
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber-button .p-button-icon) {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8.5px !important;
+    color: var(--p-surface-400);
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+}
+
+:deep(.price-stat__editor-inline .price-stat__percent-input .pi-chevron-up),
+:deep(.price-stat__editor-inline .price-stat__percent-input .pi-chevron-down),
+:deep(.price-stat__editor-inline .price-stat__percent-input .pi-chevron-up::before),
+:deep(.price-stat__editor-inline .price-stat__percent-input .pi-chevron-down::before) {
+    font-size: 8.5px !important;
+    color: var(--p-surface-400);
+}
+
+:deep(.price-stat__percent-input .pi-chevron-up),
+:deep(.price-stat__percent-input .pi-chevron-down),
+:deep(.price-stat__percent-input .pi-chevron-up::before),
+:deep(.price-stat__percent-input .pi-chevron-down::before) {
+    font-size: 8.5px !important;
+    color: var(--p-surface-400);
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-button:hover) {
+    background: var(--p-tideblue-50);
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-stacked .p-inputnumber-button) {
+    border: none;
+}
+
+:deep(.price-stat__percent-input .p-inputnumber-button + .p-inputnumber-button) {
+    border-top: none;
+}
+
+/* CONNECT-466 — match the dropdown calculator inputs to the pager select so
+   they feel native to the app (per John Dugan's review): 28px tall (spacing-7),
+   xs corner radius, gray-200 border. */
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group),
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input) {
+    height: var(--p-spacing-7) !important;
+    border-radius: var(--p-border-radius-xs) !important;
+    border-color: var(--p-gray-200) !important;
+}
+
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputnumber),
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputnumber-input),
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputgroupaddon),
+:deep(.price-stat__dropdown-inputs .price-stat__percent-input .p-inputnumber-input) {
+    height: var(--p-spacing-7) !important;
+    line-height: var(--p-spacing-7) !important;
+}
+
+/* The "$" separator matches the same gray-200 as the outer border. */
+:deep(.price-stat__dropdown-inputs .price-stat__dollar-group .p-inputgroupaddon) {
+    border-right-color: var(--p-gray-200);
+}
+:deep(.price-stat__value) {
+    max-width: 100%;
+    min-width: 0;
+}
+
+:deep(.price-stat__copy) {
+    min-width: 0;
+}
+
+:deep(.price-stat__value-text),
+:deep(.price-stat__copy .base-copy-text__link) {
+    min-width: 0;
+    max-width: 18ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

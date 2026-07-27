@@ -1,0 +1,73 @@
+{
+    "root": true,
+    "extends": ["@johndugan", "plugin:vue/vue3-recommended"],
+    "parser": "vue-eslint-parser",
+    "parserOptions": {
+        "parser": "@babel/eslint-parser",
+        "requireConfigFile": false,
+        "ecmaVersion": "latest",
+        "sourceType": "module"
+    },
+    "env": {
+        "browser": true,
+        "node": true
+    },
+    "globals": {
+        "defineNuxtConfig": "readonly",
+        "defineNuxtRouteMiddleware": "readonly",
+        "definePageMeta": "readonly",
+        "navigateTo": "readonly",
+        "useRuntimeConfig": "readonly",
+        "useRoute": "readonly",
+        "useRouter": "readonly",
+        "ref": "readonly",
+        "reactive": "readonly",
+        "computed": "readonly",
+        "watch": "readonly",
+        "watchEffect": "readonly",
+        "onMounted": "readonly",
+        "onUnmounted": "readonly",
+        "onBeforeMount": "readonly",
+        "onBeforeUnmount": "readonly",
+        "nextTick": "readonly",
+        "defineProps": "readonly",
+        "defineEmits": "readonly",
+        "defineExpose": "readonly",
+        "withDefaults": "readonly",
+        "useTableScroll": "readonly",
+        "useDirectus": "readonly",
+        "tryCatch": "readonly",
+        "defineNuxtPlugin": "readonly",
+        "defineStore": "readonly",
+        "useLoadingStore": "readonly",
+        "useAuthStore": "readonly",
+        "useNavigationStore": "readonly",
+        "useSearchStore": "readonly",
+        "useTableStateStore": "readonly",
+        "useDirectusCrud": "readonly",
+        "useBusinessPartners": "readonly",
+        "useBusinessPartnerGroups": "readonly",
+        "useContacts": "readonly",
+        "useAddresses": "readonly",
+        "usePhoneNumbers": "readonly",
+        "useItems": "readonly",
+        "useExactKeySearch": "readonly",
+        "useCrossScopeExactMatch": "readonly",
+        "isExactKeySearch": "readonly"
+    },
+    "rules": {
+        "consistent-return": "off",
+        "indent": ["warn", 2],
+        "semi": ["warn", "never"],
+        "object-shorthand": ["warn", "always"],
+        "object-curly-spacing": ["warn", "always"],
+        "comma-dangle": ["warn", "always-multiline"],
+        "no-undefined": "off",
+        "no-undef": "off",
+        "no-shadow": ["error", {
+            "allow": ["useDirectus", "useTableScroll", "tryCatch", "useDirectusCrud", "useBusinessPartners", "useBusinessPartnerGroups", "useContacts", "useAddresses", "usePhoneNumbers", "useItems", "useSearchStore", "useTableStateStore"]
+        }],
+        "vue/multi-word-component-names": "off",
+        "vue/html-self-closing": "off"
+    }
+}

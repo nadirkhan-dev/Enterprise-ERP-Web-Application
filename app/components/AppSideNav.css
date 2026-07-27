@@ -1,0 +1,574 @@
+.app-side-nav a {
+    color: var(--p-surface-0);
+}
+
+/* Inner content fade (synced with sidebar slide) */
+.nav-fade-enter-active,
+.nav-fade-leave-active {
+    transition:
+        opacity var(--p-transition-duration-normal)
+            var(--p-transition-timing-ease-in-out),
+        transform var(--p-transition-duration-normal)
+            var(--p-transition-timing-ease-in-out);
+}
+
+.nav-fade-enter-from,
+.nav-fade-leave-to {
+    opacity: 0;
+    transform: translateX(-8px);
+}
+
+.app-side-nav {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+    width: 224px;
+    background: var(--p-deepblue-900);
+    display: flex;
+    flex-direction: column;
+    transition:
+        width var(--p-transition-duration-slow)
+            var(--p-transition-timing-ease-in-out),
+        transform var(--p-transition-duration-slow)
+            var(--p-transition-timing-ease-in-out);
+    will-change: width;
+    z-index: 100;
+    overflow: hidden;
+}
+
+.app-side-nav.is-collapsed {
+    width: 64px;
+}
+
+.app-side-nav.is-mobile {
+    width: 0;
+    z-index: 102;
+}
+
+.app-side-nav.is-mobile.is-open {
+    width: 224px;
+}
+
+.app-side-nav.is-mobile .app-side-nav__header,
+.app-side-nav.is-mobile .app-side-nav__nav,
+.app-side-nav.is-mobile .app-side-nav__footer {
+    min-width: 224px;
+    transform: translateX(var(--inner-slide-x, 0px));
+    opacity: var(--inner-opacity, 1);
+    transition: var(
+        --inner-transition,
+        transform var(--p-transition-duration-slow)
+            var(--p-transition-timing-ease-in-out),
+        opacity var(--p-transition-duration-slow)
+            var(--p-transition-timing-ease-in-out)
+    );
+}
+
+.app-side-nav__swipe-zone {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 24px;
+    height: 100%;
+    z-index: 100;
+    touch-action: pan-y;
+}
+
+.app-side-nav__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 101;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--p-transition-duration-slow)
+        var(--p-transition-timing-ease);
+    touch-action: pan-y;
+}
+
+.app-side-nav__backdrop.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.app-side-nav__watermark {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    aspect-ratio: 224 / 195;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 0;
+}
+
+.app-side-nav__watermark-svg {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Collapsed: keep the eagle visible but pin it to the bottom-center of the
+   narrow rail. The SVG's preserveAspectRatio="xMidYMax meet" handles the
+   horizontal centering; we just need to give the wrapper a height that
+   makes sense for a 64px-wide rail. */
+.app-side-nav__watermark--collapsed {
+    aspect-ratio: 1 / 1;
+    opacity: 0.75;
+}
+
+.app-side-nav__header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--p-spacing-6);
+    flex-shrink: 0;
+    min-height: 0;
+    margin-bottom: var(--p-spacing-1);
+    position: relative;
+    z-index: 1;
+}
+
+.app-side-nav__logo {
+    width: 100px;
+    height: auto;
+}
+
+.app-side-nav__logo-mark {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    margin: calc(var(--p-spacing-2) * -1) 0;
+}
+
+.app-side-nav__nav {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 var(--p-spacing-4);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--p-deepblue-700) transparent;
+    position: relative;
+    z-index: 1;
+
+    @media (max-height: 570px) and (min-height: 470px) {
+        overflow-y: auto;
+    }
+
+    @media (max-height: 469px) {
+        overflow-y: auto;
+    }
+}
+
+.app-side-nav__nav::-webkit-scrollbar {
+    width: 4px;
+}
+
+.app-side-nav__nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.app-side-nav__nav::-webkit-scrollbar-thumb {
+    background: var(--p-deepblue-700);
+    border-radius: 2px;
+}
+
+.app-side-nav__nav--icons {
+    padding: 0;
+    align-items: center;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px var(--p-spacing-2);
+    border-radius: var(--p-border-radius-md);
+    color: var(--p-gray-500);
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+        background var(--p-transition-duration-normal)
+            var(--p-transition-timing-ease),
+        color var(--p-transition-duration-normal)
+            var(--p-transition-timing-ease);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-normal);
+    line-height: 20px;
+}
+
+.nav-item:hover:not(.is-active) {
+    background: var(--p-deepblue-800);
+    color: var(--p-surface-0);
+}
+
+.nav-item.is-active {
+    background: var(--p-primary-500);
+    color: var(--p-surface-0);
+}
+
+.nav-item--leaf {
+    padding: 7px var(--p-spacing-2);
+}
+
+.nav-item--parent {
+    padding: 7px var(--p-spacing-2);
+}
+
+.nav-item--disabled {
+    opacity: var(--p-opacity-disabled);
+    pointer-events: none;
+    cursor: default;
+}
+
+.nav-item__icon {
+    flex-shrink: 0;
+    font-size: var(--p-font-size-sm);
+}
+
+.nav-item__label {
+    flex: 1;
+}
+
+.nav-item__chevron {
+    font-size: 10px;
+    transition: transform var(--p-transition-duration-normal)
+        var(--p-transition-timing-ease);
+}
+
+.nav-item__chevron.is-expanded {
+    transform: rotate(90deg);
+}
+
+.nav-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--p-spacing-10);
+    height: var(--p-spacing-10);
+    min-width: var(--p-spacing-10);
+    min-height: var(--p-spacing-10);
+    flex-shrink: 0;
+    border-radius: var(--p-border-radius-sm);
+    color: var(--p-gray-500);
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+        background var(--p-transition-duration-normal)
+            var(--p-transition-timing-ease),
+        color var(--p-transition-duration-normal)
+            var(--p-transition-timing-ease);
+    font-size: var(--p-font-size-base);
+    margin: var(--p-spacing-1) 0;
+}
+
+.nav-icon-btn--disabled {
+    opacity: var(--p-opacity-disabled);
+    pointer-events: none;
+    cursor: default;
+}
+
+.nav-icon-btn:hover:not(.is-active) {
+    background: var(--p-skyblue-600);
+    color: var(--p-surface-0);
+}
+
+.nav-icon-btn.is-active {
+    background: var(--p-primary-500);
+    color: var(--p-surface-0);
+}
+
+:deep(.p-panelmenu-root-list),
+:deep(.p-panelmenu-item-list) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+:deep(.p-panelmenu-item) {
+    background: transparent;
+}
+
+:deep(.p-panelmenu-header-action),
+:deep(.p-panelmenu-item-action) {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    color: inherit;
+}
+
+:deep(.p-panelmenu-header-action:focus),
+:deep(.p-panelmenu-item-action:focus) {
+    box-shadow: none;
+    outline: none;
+}
+
+/* Hide PrimeVue's built-in chevron since we provide our own */
+:deep(.p-panelmenu-header-icon) {
+    display: none;
+}
+
+.app-side-nav__footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 74px;
+    padding: 0 var(--p-spacing-4);
+    flex: 0 0 74px;
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+
+    @media (max-height: 570px) and (min-height: 470px) {
+        height: clamp(0px, calc((100vh - 470px) * 0.74), 74px);
+        min-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        flex: 0 0 clamp(0px, calc((100vh - 470px) * 0.74), 74px);
+    }
+
+    @media (max-height: 469px) {
+        height: 74px;
+        min-height: 74px;
+        flex: 0 0 74px;
+    }
+}
+
+.app-side-nav__version {
+    font-family: var(--p-mono-family);
+    font-size: var(--p-font-size-2xs);
+    color: var(--p-surface-0);
+    white-space: nowrap;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: max-content;
+    appearance: none;
+    border: 0;
+    padding: var(--p-spacing-1) var(--p-spacing-2);
+    background: transparent;
+    border-radius: var(--p-border-radius-full);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: background var(--p-transition-duration-normal) var(--p-transition-timing-ease);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.app-side-nav__version:hover {
+    background: var(--p-deepblue-800);
+}
+
+.app-side-nav__version-dot {
+    position: absolute;
+    top: -5px;
+    right: -2px;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #ff3b30;
+    box-shadow:
+        0 0 0 2px rgba(10, 25, 46, 0.92),
+        0 0 0 4px rgba(255, 59, 48, 0.18);
+    pointer-events: none;
+}
+
+.app-side-nav__update-cta {
+    position: absolute;
+    left: 50%;
+    /* `translate` is a standalone property — independent of `transform`,
+       so animate.css can scale via `transform: scale3d(...)` without
+       wiping the centering offset. */
+    translate: -50% 0;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--p-spacing-2);
+    /* Match the post-upgrade version label's hover padding (CONNECT-707) so the
+       pulsing pill sits tight and no longer bumps the page-top scroll trigger. */
+    padding: var(--p-spacing-1) var(--p-spacing-2);
+    border-radius: var(--p-border-radius-full);
+    border: 0;
+    background: var(--p-orange-500);
+    color: var(--p-surface-0);
+    font-family: var(--p-mono-family);
+    font-size: var(--p-font-size-2xs);
+    font-weight: var(--p-font-weight-medium);
+    cursor: pointer;
+    box-shadow: var(--p-shadow-md);
+    transition:
+        background var(--p-transition-duration-normal),
+        transform var(--p-transition-duration-fast);
+}
+
+.app-side-nav__update-cta:hover {
+    background: var(--p-orange-600);
+    animation: none;
+}
+
+.app-side-nav__update-cta:active {
+    transform: scale(0.97);
+}
+
+.app-side-nav__update-cta:focus-visible {
+    outline: 2px solid var(--p-surface-0);
+    outline-offset: var(--p-spacing-1);
+}
+
+.app-side-nav__update-cta-text {
+    line-height: 1;
+}
+
+.app-side-nav__update-cta-icon {
+    position: absolute;
+    bottom: var(--p-spacing-3);
+    left: 50%;
+    translate: -50% 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--p-spacing-10);
+    height: var(--p-spacing-10);
+    border-radius: 50%;
+    border: 0;
+    background: var(--p-orange-500);
+    color: var(--p-surface-0);
+    font-size: var(--p-font-size-lg);
+    cursor: pointer;
+    box-shadow: var(--p-shadow-md);
+    transition:
+        background var(--p-transition-duration-normal),
+        transform var(--p-transition-duration-fast),
+        bottom var(--p-transition-duration-normal);
+}
+
+.app-side-nav__update-cta-icon:hover {
+    background: var(--p-orange-600);
+    animation: none;
+}
+
+.app-side-nav__update-cta-icon:active {
+    transform: scale(0.95);
+}
+
+.app-side-nav__update-cta-icon:focus-visible {
+    outline: 2px solid var(--p-surface-0);
+    outline-offset: var(--p-spacing-1);
+}
+
+.is-collapsed .app-side-nav__footer {
+    flex-direction: column-reverse;
+    gap: 0;
+    justify-content: flex-start;
+    padding-top: clamp(var(--p-spacing-2), 2vh, var(--p-spacing-4));
+    padding-bottom: clamp(var(--p-spacing-2), 2vh, var(--p-spacing-4));
+}
+
+.is-collapsed .app-side-nav__footer--has-scroll-top {
+    min-height: calc(
+        clamp(var(--p-spacing-2), 2vh, var(--p-spacing-4)) * 2 +
+            var(--p-spacing-8) + var(--p-spacing-7) + var(--p-spacing-3)
+    );
+    flex-basis: calc(
+        clamp(var(--p-spacing-2), 2vh, var(--p-spacing-4)) * 2 +
+            var(--p-spacing-8) + var(--p-spacing-7) + var(--p-spacing-3)
+    );
+}
+
+.is-collapsed .app-side-nav__footer .app-side-nav__scroll-top {
+    position: relative !important;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+}
+
+.is-collapsed .app-side-nav__footer .app-side-nav__update-cta-icon {
+    position: relative !important;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    transform: none;
+    translate: 0;
+    width: var(--p-spacing-7);
+    height: var(--p-spacing-7);
+    font-size: var(--p-font-size-sm);
+}
+
+.is-collapsed .app-side-nav__footer--has-scroll-top .app-side-nav__scroll-top {
+    margin-top: var(--p-spacing-3);
+}
+
+.is-collapsed .app-side-nav__footer .app-side-nav__update-cta-icon:active {
+    transform: scale(0.95);
+}
+
+.app-side-nav__version-text-wrap {
+    position: relative;
+    display: inline-block;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.app-side-nav__version-text {
+    font-weight: var(--p-font-weight-normal);
+    line-height: 1;
+    text-decoration: none;
+}
+
+.app-side-nav__version:focus-visible {
+    outline: none;
+}
+
+.app-side-nav__version:focus-visible .app-side-nav__version-text-wrap {
+    outline: 2px solid var(--p-surface-0);
+    outline-offset: var(--p-spacing-1);
+    border-radius: var(--p-border-radius-sm);
+}
+
+.app-side-nav__scroll-top {
+    display: none;
+    width: var(--p-spacing-8);
+    height: var(--p-spacing-8);
+    border-radius: var(--p-border-radius-full);
+    border: none;
+    background: var(--p-surface-0);
+    color: var(--p-deepblue-900);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--p-shadow-sm);
+    flex-shrink: 0;
+    position: absolute !important;
+    left: var(--p-spacing-4);
+
+    @media (min-width: 768px) {
+        display: inline-flex;
+    }
+}
+
+.app-side-nav.is-mobile.is-collapsed .app-side-nav__scroll-top {
+    background: var(--p-primary-500);
+    color: var(--p-surface-0);
+}
+
+:deep(.p-panelmenu-panel) {
+    padding: 0;
+}
+
+:deep(.p-panelmenu) {
+    gap: 2px;
+}

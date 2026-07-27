@@ -1,0 +1,133 @@
+.drawer-width {
+    width: 100vw !important;
+
+    @media (min-width: 768px) {
+        width: var(--p-layout-drawer-width) !important;
+    }
+}
+
+.drawer-width-landing-page {
+    width: 100vw !important;
+
+    @media (min-width: 768px) {
+        width: var(--p-layout-drawer-width) !important;
+    }
+}
+
+.p-drawer-footer {
+    position: relative;
+    z-index: 1;
+}
+
+/* Drawer list ⇄ detail slide (Vue <Transition> classes) — a horizontal push
+   shared by the drawer body panes (DrawerManufacturerAssociations) and the
+   BaseDrawer header row (title + close icon) so they travel together.
+   "forward" (View Details) slides the new pane in from the right while the old
+   one exits left; "back" reverses. The leaving pane is absolutely positioned
+   (inside a position: relative wrapper) so both panes move side by side as one
+   continuous push; the drawer's overflow-x: hidden clips the offscreen pane. */
+.drawer-slide-forward-enter-active,
+.drawer-slide-forward-leave-active,
+.drawer-slide-back-enter-active,
+.drawer-slide-back-leave-active {
+    transition: transform var(--p-transition-duration-slow) var(--p-transition-timing-ease-out);
+}
+
+.drawer-slide-forward-leave-active,
+.drawer-slide-back-leave-active {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+}
+
+.drawer-slide-forward-enter-from {
+    transform: translateX(100%);
+}
+
+.drawer-slide-forward-leave-to {
+    transform: translateX(-100%);
+}
+
+.drawer-slide-back-enter-from {
+    transform: translateX(-100%);
+}
+
+.drawer-slide-back-leave-to {
+    transform: translateX(100%);
+}
+
+/* Thin styled scrollbar on drawer content. scrollbar-gutter: stable keeps the
+   gutter reserved at all times so the drawer chrome doesn't shift when content
+   becomes scrollable (e.g. after adding a phone number which opens the inline
+   edit form and grows the content past the viewport). */
+.p-drawer-content {
+    scrollbar-width: thin;
+    scrollbar-color: var(--p-gray-100) transparent;
+    scrollbar-gutter: stable;
+}
+
+.p-drawer-content::-webkit-scrollbar {
+    width: var(--p-spacing-2-25);
+}
+
+.p-drawer-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.p-drawer-content::-webkit-scrollbar-thumb {
+    background: var(--p-gray-100);
+    border-radius: var(--p-border-radius-sm);
+}
+
+.drawer-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-spacing-4);
+}
+
+.drawer-section__heading {
+    display: flex;
+    align-items: center;
+    gap: var(--p-spacing-3);
+}
+
+.drawer-section__heading::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--p-surface-200);
+}
+
+.drawer-section__title {
+    font-size: var(--p-font-size-base);
+    font-weight: var(--p-font-weight-bold);
+    color: var(--p-deepblue-900);
+    white-space: nowrap;
+}
+
+/* Select overlay constrained to trigger width */
+.address-select-panel.p-select-overlay {
+    width: 0;
+}
+
+.address-select-panel .p-select-option-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Contacts drawer (Customers list) — header horizontal padding `.drawer-width-landing-page` is unique to DrawerViewContactInfo (its BaseDrawer uses `width="landing"`). The contacts drawer is the only one where the user expects header content (title + filter) to share exactly the same left/right inset as the contact cards below — match the body's `paddingLeft/Right` clamp from BaseDrawer's drawerPt. */
+.drawer-width-landing-page .p-drawer-header {
+    padding-left: clamp(var(--p-spacing-4), 2.5vw, var(--p-spacing-6)) !important;
+    padding-right: clamp(var(--p-spacing-4), 2.5vw, var(--p-spacing-6)) !important;
+    padding-inline: clamp(var(--p-spacing-4), 2.5vw, var(--p-spacing-6)) !important;
+}
+.drawer-width-landing-page .drawer-header-wrapper,
+.drawer-width-landing-page .drawer-header-wrapper-is-scrollable {
+    gap: var(--p-spacing-4) !important;
+}
+.drawer-width-landing-page .drawer-section__title {
+    line-height: var(--p-font-line-height-none) !important;
+}
+

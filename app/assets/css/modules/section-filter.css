@@ -1,0 +1,74 @@
+.section-filter {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.section-filter__input {
+    width: clamp(160px, 22vw, 260px);
+    padding-right: var(--p-spacing-8);
+    font-weight: var(--p-font-weight-normal);
+    transition: width var(--p-transition-duration)
+        var(--p-transition-timing-ease);
+}
+
+.section-filter__input--collapsed {
+    width: var(--p-spacing-1);
+    padding-left: var(--p-spacing-1);
+    cursor: pointer;
+}
+
+.section-filter__input--collapsed::placeholder {
+    opacity: 0;
+}
+
+/* Blue magnifier at rest (empty) in table sections (drawers override it to gray).
+   Once the user types, SectionFilterIcon swaps it for a × (pi-times) in the SAME
+   position — so the clear icon never overflows the input. */
+.section-filter__icon {
+    position: absolute;
+    top: 50%;
+    right: var(--p-spacing-2);
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--p-spacing-5);
+    height: var(--p-spacing-5);
+    border-radius: var(--p-border-radius-xs);
+    color: var(--p-skyblue-600);
+    font-size: var(--p-font-size-sm);
+    cursor: pointer;
+}
+
+/* Once the user types, the clear × is gray at rest... */
+.section-filter__icon--active {
+    color: var(--p-gray-400);
+}
+
+/* ...and gets the app's rounded tideblue-50 wash + brand-blue glyph on hover /
+   focus (matching the top-nav / drawer clear button). The box (spacing-5) fits
+   inside the input's reserved right padding, so it never overflows. */
+.section-filter__icon--active:hover,
+.section-filter__icon--active:focus-visible {
+    background: var(--p-tideblue-50);
+    color: var(--p-skyblue-600);
+}
+
+.section-filter:has(.section-filter__icon:hover) .section-filter__input--collapsed,
+.section-filter:has(.section-filter__icon:focus-visible) .section-filter__input--collapsed {
+    background: var(--p-tideblue-50);
+    transition: background var(--p-transition-duration-normal) var(--p-transition-timing-ease-out);
+}
+
+.p-button-outlined[class*="filter"]:not(:disabled):hover,
+.p-button-outlined[class*="filter"]:not(:disabled):focus-visible {
+    background: var(--p-tideblue-50);
+}
+
+/* Keyboard focus ring for the clear × — kept inside the input (1px offset). */
+.section-filter__icon--active:focus-visible {
+    outline: 1px solid var(--p-skyblue-200);
+    outline-offset: var(--p-spacing-px);
+    border-radius: var(--p-border-radius-xs);
+}

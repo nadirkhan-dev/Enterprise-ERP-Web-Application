@@ -1,0 +1,380 @@
+@import './modules/data-table.css';
+@import './modules/info-grid.css';
+@import './modules/form-field.css';
+@import './modules/stats.css';
+@import './modules/create-form.css';
+@import './modules/drawer.css';
+@import './modules/section-filter.css';
+@import './modules/duplicate-dialog.css';
+@import './modules/tool-tip.css';
+@import './modules/toast.css';
+@import './modules/tag.css';
+@import './modules/placeholder-image.css';
+
+/* Supplemental color tokens (not in PrimeVue palette) */
+:root {
+    --app-color-heading: #334155;
+    --app-color-rule: #e2e8f0;
+}
+
+/* Shared auth card-swap transition * Used by every <Transition name="card-swap"> in the auth flow. * Paired with the useCardSwapTransition() composable for JS hooks. */
+.card-swap-enter-active,
+.card-swap-leave-active {
+    overflow: hidden;
+    transition:
+        height var(--p-transition-duration-slow) var(--p-transition-timing-ease-out),
+        opacity var(--p-transition-duration-slow) var(--p-transition-timing-ease-out);
+    will-change: height, opacity;
+
+    /* Reduced motion — which Chrome also reports under Battery Saver — keeps the
+       cross-fade and drops only the size change: a fade is what these users are
+       spared the motion of, not the feedback. Switching the transition off outright
+       made the card snap between states with nothing to read the change by.
+       useCardSwapTransition() reads these computed styles and skips its own height
+       animation when height isn't among them, so this rule is what decides. */
+    @media (prefers-reduced-motion: reduce) {
+        /* Nothing is being clipped once height is left alone, and the button spinner's
+           orbit needs room to overflow (see BaseSpinner). */
+        overflow: visible;
+        transition: opacity var(--p-transition-duration-normal) var(--p-transition-timing-ease-out);
+        will-change: opacity;
+    }
+}
+
+.card-swap-leave-active {
+    /* Fade the outgoing card out a touch faster than the incoming one fades in, so the
+       swap doesn't idle on an empty card in between. */
+    @media (prefers-reduced-motion: reduce) {
+        transition-duration: var(--p-transition-duration-fast);
+    }
+}
+html {
+    scrollbar-width: none;
+}
+html::-webkit-scrollbar {
+    display: none;
+}
+
+/* Per-user preference: directus_users.show_page_scrollbar = false hides every
+   scrollbar in the app — the custom page overlay (gated in default.vue) plus the
+   native / thin scrollbars on drawers, tables, the side nav, and popovers. The
+   class is toggled on <html>, so the descendant selectors also reach PrimeVue
+   overlays teleported to <body>. Scrolling still works (wheel, trackpad, keys);
+   only the visible bar is removed. */
+html.app-hide-scrollbars *,
+html.app-hide-scrollbars *::before,
+html.app-hide-scrollbars *::after {
+    scrollbar-width: none;
+}
+
+html.app-hide-scrollbars ::-webkit-scrollbar {
+    display: none;
+}
+
+body {
+    font-family: var(--p-font-family);
+    font-size: var(--p-font-size-base);
+    font-weight: var(--p-font-weight-normal);
+    line-height: var(--p-font-line-height-normal);
+    background-color: var(--p-surface-50);
+    margin: 0;
+}
+
+.app-layout__content [id] {
+    scroll-margin-top: calc(
+        var(--p-spacing-16) + var(--p-spacing-4) + var(--p-spacing-8)
+    );
+}
+
+/* PrimeVue Select / MultiSelect — searchable dropdown filter input Override inputtext's larger paddingY (0.59rem) so the filter input matches the dropdown trigger control's height exactly. Replaces all per-component `:pt="{ pcFilter: { root: { style: 'height: 39px' } } }"` overrides. */
+.p-select-filter,
+.p-multiselect-filter {
+    padding-top: var(--p-spacing-2);
+    padding-bottom: var(--p-spacing-2);
+}
+
+/* PrimeVue Select: hover background only — no size/font changes */
+.p-select-clear-icon,
+.p-select-dropdown {
+    transition: background-color var(--p-transition-duration-fast);
+}
+
+.p-select-clear-icon {
+    color: var(--p-gray-400);
+    border-radius: var(--p-border-radius-xs);
+    /* 24px hit area + hover chip like the close button (BaseIconButton): a fixed
+       24px box with border-box padding scales the SVG to a 16px content area. */
+    box-sizing: border-box;
+    width: var(--p-spacing-6);
+    height: var(--p-spacing-6);
+    padding: var(--p-spacing-1);
+}
+
+.p-select-clear-icon:hover {
+    color: var(--p-skyblue-600);
+    background: var(--p-tideblue-50);
+}
+.p-select-dropdown {
+    position: relative;
+    isolation: isolate;
+}
+
+.p-select-dropdown::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: var(--p-spacing-6);
+    height: var(--p-spacing-6);
+    border-radius: var(--p-border-radius-xs);
+    background: transparent;
+    transition: background-color var(--p-transition-duration-fast);
+    z-index: -1;
+}
+
+.p-select-dropdown:hover {
+    color: var(--p-skyblue-600);
+}
+
+.p-select-dropdown:hover::before {
+    background: var(--p-tideblue-50);
+}
+
+/* Shared backdrop blur (sidebar, dialogs) */
+.app-backdrop-blur {
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+/* PrimeVue's mask only animates `background` (not `backdrop-filter`) on
+   enter/leave, so the blur "snaps" while the dim fades. Replace PrimeVue's
+   animations with versions that ride both properties together so the blur
+   eases in on open and eases out on close at the same speed. */
+.app-backdrop-blur.p-overlay-mask-enter-active {
+    animation: app-backdrop-enter var(--p-mask-transition-duration, 200ms) ease-out forwards !important;
+}
+
+.app-backdrop-blur.p-overlay-mask-leave-active {
+    animation: app-backdrop-leave var(--p-mask-transition-duration, 200ms) ease-out forwards !important;
+}
+
+@keyframes app-backdrop-enter {
+    from {
+        background: transparent;
+        backdrop-filter: blur(0);
+        -webkit-backdrop-filter: blur(0);
+    }
+    to {
+        background: rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(6px);
+    }
+}
+
+@keyframes app-backdrop-leave {
+    from {
+        background: rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(6px);
+    }
+    to {
+        background: transparent;
+        backdrop-filter: blur(0);
+        -webkit-backdrop-filter: blur(0);
+    }
+}
+
+/* Expand clickable hit area without shifting surrounding layout * Adds an invisible 32×32 tap target via ::after for legacy bare-icon call * sites. Migrated call sites use <BaseIconButton> which is already 32×32. */
+.icon-hit-area {
+    position: relative;
+    cursor: pointer;
+}
+.icon-hit-area::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: var(--p-spacing-8);
+    height: var(--p-spacing-8);
+}
+
+/* Shared interaction treatment for bare clickable `<i>` icons that can't be a
+   <BaseIconButton> (e.g. filter-toggle icons positioned inside an input). Pair
+   with `.icon-hit-area` to reuse its 32×32 ::after as the hover surface. Mirrors
+   BaseIconButton's interaction states: on hover/focus/active the icon goes
+   brand-blue on a light-blue rounded background. The RESTING colour is owned by
+   the call site (blue for primary actions, gray for secondary) and is preserved
+   — only the interaction state is applied here. */
+.icon-action {
+    cursor: pointer;
+    isolation: isolate;
+    transition: color var(--p-transition-duration-normal) var(--p-transition-timing-ease-out);
+}
+
+.icon-action.icon-hit-area::after {
+    border-radius: var(--p-border-radius-xs);
+    background: transparent;
+    transition: background var(--p-transition-duration-normal) var(--p-transition-timing-ease-out);
+    z-index: -1;
+}
+
+.icon-action:hover,
+.icon-action:focus-visible,
+.icon-action:active {
+    color: var(--p-skyblue-600);
+}
+
+.icon-action.icon-hit-area:hover::after,
+.icon-action.icon-hit-area:focus-visible::after,
+.icon-action.icon-hit-area:active::after {
+    background: var(--p-tideblue-50);
+}
+
+/* Prevent iOS auto-zoom on input focus */
+/* iOS Safari zooms the viewport when a focused input has font-size < 16px.
+   Mobile base: 16px to stop zoom. Desktop: restore the sm size (14px). */
+.p-inputtext,
+.p-textarea,
+.p-password-input,
+.p-inputnumber-input,
+.p-select-label,
+.p-multiselect-label,
+.p-autocomplete-input,
+.p-datepicker-input,
+.p-inputmask,
+.p-inputotp-input,
+.p-chips-input,
+.p-treeselect-label {
+    font-size: var(--p-font-size-base) !important;
+
+    @media (min-width: 768px) {
+        font-size: var(--p-font-size-sm) !important;
+    }
+}
+
+/* Loading buttons: keep the dimmed "disabled" look on the button, but render the
+   spinner crisply on top. A button is "loading" when it contains our
+   <BaseSpinner> (we only render one in a button while loading) — matching on that
+   alone is more robust than relying on the disabled attribute. PrimeVue dims a
+   disabled button via `opacity` on the whole `.p-button`, and CSS opacity on a
+   parent dims every descendant and can't be undone on a child (z-index doesn't
+   help). So we keep the button at full opacity and lay a translucent surface veil
+   over it to reproduce the dim, with the spinner stacked above the veil. */
+.p-button:has(.base-spinner) {
+    position: relative;
+    opacity: 1;
+    /* PrimeVue sets overflow:hidden for the ripple (in its `@layer primevue`), which
+       clips the veil to inside the border and leaves the border ring undimmed. Force
+       it visible so the veil covers the whole border box. !important is required: an
+       unlayered !important beats PrimeVue's layered declaration. */
+    overflow: visible !important;
+    /* The veil (::after) now covers the whole border box, so it dims the border along
+       with the fill — no need to strip the border. Leaving it intact keeps outlined
+       buttons (e.g. Refresh) recognisable while loading instead of erasing their edge.
+       Still kill the raised shadow / focus ring, which the veil can't dim. */
+    box-shadow: none !important;
+    outline-color: transparent !important;
+}
+
+/* A disabled <Select> in its loading state is faded by PrimeVue's `.p-disabled`
+   opacity, which dims the loading spinner along with it. Same remedy as buttons:
+   hold the field at full opacity (!important to beat PrimeVue's layered rule) and
+   reproduce the dim with the veil, so the spinner stays crisp on top. */
+.p-select.p-disabled:has(.base-spinner) {
+    position: relative;
+    opacity: 1 !important;
+}
+
+.p-button:has(.base-spinner)::after,
+.p-select.p-disabled:has(.base-spinner)::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: var(--p-surface-0);
+    opacity: calc(1 - var(--p-disabled-opacity));
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Descendant (not direct child): some buttons wrap the spinner in an icon span
+   (e.g. "Next Step"), so `> .base-spinner` would miss it and leave it under the veil. */
+.p-button:has(.base-spinner) .base-spinner,
+.p-select.p-disabled:has(.base-spinner) .base-spinner {
+    position: relative;
+    z-index: 2;
+}
+
+.info-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--p-spacing-1-75);
+    margin: 0 0 var(--p-spacing-3);
+    padding: var(--p-spacing-1-75) var(--p-spacing-2-625);
+    background: var(--p-skyblue-50);
+    border: 1px solid var(--p-skyblue-200);
+    border-radius: var(--p-border-radius-xs);
+    box-shadow: var(--p-shadow-xs);
+    color: var(--p-skyblue-600);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-semibold);
+    line-height: var(--p-spacing-5);
+}
+
+.info-note .pi {
+    flex-shrink: 0;
+    line-height: var(--p-spacing-5);
+    color: var(--p-skyblue-600);
+    font-size: var(--p-font-size-sm);
+}
+
+/* Accessible visually-hidden utility: removes an element from sight while keeping
+   it in the accessibility tree and clickable (used to hide native file inputs
+   behind a styled trigger). Shared by the customer/supplier/manufacturer logo
+   uploads. */
+.visually-hidden {
+    position: absolute;
+    width: var(--p-spacing-px);
+    height: var(--p-spacing-px);
+    padding: 0;
+    margin: calc(var(--p-spacing-px) * -1);
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Rank column — the pill is centered in its cell so it reads as one column of
+   badges rather than a ragged left edge. Applied via the Column `body-class` on
+   every table that ranks rows (manufacturer suppliers, supplier manufacturers). */
+.rank-col {
+    text-align: center;
+}
+
+/* Rank pill — a true circle at every rank: width and height are the same fixed
+   28px, never min-width + padding, so a wider number can't stretch it into an
+   oval. 28px reads well at one or two digits (the common case) and leaves three
+   digits — the outlier — a little breathing room inside the border.
+   Monospace + tabular-nums so the digits sit on a fixed grid down the column. */
+.rank-pill {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--p-spacing-7);
+    height: var(--p-spacing-7);
+    padding: 0;
+    flex-shrink: 0;
+    border-radius: var(--p-border-radius-full);
+    border: 1px solid var(--p-gray-200);
+    /* body-sm-mono/regular */
+    font-family: var(--p-mono-family);
+    font-size: var(--p-font-size-xs);
+    font-weight: var(--p-font-weight-medium);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--p-gray-800);
+    text-align: center;
+}

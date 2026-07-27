@@ -1,0 +1,104 @@
+.p-tooltip .p-tooltip-text {
+    background: var(--p-deepblue-50);
+    color: var(--p-deepblue-900);
+    font-size: var(--p-font-size-sm);
+}
+
+.p-tooltip-right .p-tooltip-arrow {
+    border-right-color: var(--p-deepblue-50);
+}
+
+.p-tooltip-left .p-tooltip-arrow {
+    border-left-color: var(--p-deepblue-50);
+}
+
+.p-tooltip-top .p-tooltip-arrow {
+    border-top-color: var(--p-deepblue-50);
+}
+
+.p-tooltip-bottom .p-tooltip-arrow {
+    border-bottom-color: var(--p-deepblue-50);
+}
+
+
+.p-tooltip.sap-tooltip--success,
+.p-tooltip.sap-tooltip--error {
+    max-width: none;
+}
+
+.p-tooltip.sap-tooltip--success .p-tooltip-text,
+.p-tooltip.sap-tooltip--error .p-tooltip-text {
+    max-width: none;
+    width: max-content;
+    white-space: nowrap;
+}
+
+.p-tooltip.sap-tooltip--success.p-tooltip-top,
+.p-tooltip.sap-tooltip--error.p-tooltip-top {
+    margin-top: calc(-1 * var(--p-spacing-1));
+}
+
+.p-tooltip.sap-tooltip--success .p-tooltip-text {
+    background: var(--p-vividgreen-50);
+    color: var(--p-vividgreen-500);
+}
+
+
+.p-tooltip.sap-tooltip--success.p-tooltip-top .p-tooltip-arrow {
+    border-top-color: var(--p-vividgreen-50);
+}
+.p-tooltip.sap-tooltip--success.p-tooltip-bottom .p-tooltip-arrow {
+    border-bottom-color: var(--p-vividgreen-50);
+}
+.p-tooltip.sap-tooltip--success.p-tooltip-left .p-tooltip-arrow {
+    border-left-color: var(--p-vividgreen-50);
+}
+.p-tooltip.sap-tooltip--success.p-tooltip-right .p-tooltip-arrow {
+    border-right-color: var(--p-vividgreen-50);
+}
+
+.p-tooltip.sap-tooltip--error .p-tooltip-text {
+    background: var(--p-red-50);
+    color: var(--p-red-500);
+}
+
+.p-tooltip.sap-tooltip--error.p-tooltip-top .p-tooltip-arrow {
+    border-top-color: var(--p-red-50);
+}
+.p-tooltip.sap-tooltip--error.p-tooltip-bottom .p-tooltip-arrow {
+    border-bottom-color: var(--p-red-50);
+}
+.p-tooltip.sap-tooltip--error.p-tooltip-left .p-tooltip-arrow {
+    border-left-color: var(--p-red-50);
+}
+.p-tooltip.sap-tooltip--error.p-tooltip-right .p-tooltip-arrow {
+    border-right-color: var(--p-red-50);
+}
+
+.p-contextmenu {
+    border: none;
+    min-width: auto;
+}
+
+.p-contextmenu-item-label {
+    font-size: var(--p-font-size-sm);
+}
+
+.p-contextmenu-item-link {
+    color: var(--p-deepblue-900);
+}
+
+.p-contextmenu-item-icon {
+    color: var(--p-deepblue-900);
+}
+
+.p-contextmenu-root-list, .p-contextmenu-submenu {
+    background: var(--p-deepblue-50);
+    border-radius: var(--p-border-radius-md);
+}
+
+.p-contextmenu-item.p-focus > .p-contextmenu-item-content,
+.p-contextmenu-item:not(.p-disabled) > .p-contextmenu-item-content:hover {
+    background: var(--p-deepblue-50);
+    color: var(--p-deepblue-900);
+}

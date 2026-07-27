@@ -1,0 +1,50 @@
+# Nuxt dev/build outputs
+.output
+.output.bak
+
+# Release notes are generated at deploy time (see .github/workflows/deploy.yml);
+# any local copy is for testing only and must never be committed.
+public/release-notes.json
+public/version.json
+.data
+.nuxt
+.nitro
+.cache
+dist
+
+# Node dependencies
+node_modules
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+.fleet
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# IDE settings (personal per developer)
+.vscode/
+.idea
+
+# Local config overrides
+*.local
+
+# Claude Code local settings (personal per developer)
+.claude/settings.local.json
+.claude/memory/
+
+docs/*
+
+# Personal reference notes
+APPLICATION_NOTES.md
+DIRECTUS_NOTES.md
+
+
+# Ignore mcp
+.mcp.json
