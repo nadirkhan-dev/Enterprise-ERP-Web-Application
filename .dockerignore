@@ -1,0 +1,47 @@
+# Keep the build context small and the image clean. Without this every `docker
+# build` ships the whole working tree to the daemon (~550MB here, most of it
+# node_modules and .git) and `COPY . .` lands it in the builder stage.
+#
+# Three reasons this matters:
+#  - speed: the context transfer dominates an otherwise cached build.
+#  - correctness: a local node_modules would overwrite the one `npm ci` just
+#    installed — host-platform binaries inside a linux/alpine image.
+#  - secrets: .env holds live credentials and must never reach an image layer.
+
+# Dependencies + build output (all reproduced inside the image)
+node_modules
+.nuxt
+.output
+dist
+coverage
+
+# Secrets and local config
+.env
+.env.*
+
+# VCS and CI (not needed to build the app)
+.git
+.gitignore
+.github
+.githooks
+
+# Editor / tooling / docs
+.claude
+.vscode
+.idea
+.DS_Store
+*.log
+CLAUDE.md
+README.md
+.mcp.json
+start-claude.sh
+
+# Tests and their config — the image runs the built server, nothing more
+tests
+vitest.config.js
+
+# Deployment/infra assets consumed by the workflow on the host, not the image
+docker
+directus
+directus-config
+ecosystem.config.cjs

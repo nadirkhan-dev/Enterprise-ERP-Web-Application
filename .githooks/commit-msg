@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Enforces conventional commit messages.
+# Allowed prefixes: feat, fix, chore, refactor, docs, style, test, perf, ci, build, revert
+#
+# Examples:
+#   feat: add 2FA setup flow
+#   fix: resolve login redirect loop
+#   chore: update dependencies
+
+COMMIT_MSG_FILE="$1"
+COMMIT_MSG=$(head -1 "$COMMIT_MSG_FILE")
+
+# Skip merge commits
+if echo "$COMMIT_MSG" | grep -qE "^Merge "; then
+  exit 0
+fi
+
+PATTERN="^(feat|fix|chore|refactor|docs|style|test|perf|ci|build|revert): .{3,}"
+
+if ! echo "$COMMIT_MSG" | grep -qE "$PATTERN"; then
+  echo ""
+  echo "  ERROR: Invalid commit message format."
+  echo ""
+  echo "  Expected: <type>: <description>"
+  echo ""
+  echo "  Types:  feat | fix | chore | refactor | docs | style | test | perf | ci | build | revert"
+  echo ""
+  echo "  Examples:"
+  echo "    feat: add user authentication flow"
+  echo "    fix: resolve sidebar collapse on mobile"
+  echo "    chore: update PrimeVue to v4.6"
+  echo ""
+  echo "  Your message: \"$COMMIT_MSG\""
+  echo ""
+  exit 1
+fi

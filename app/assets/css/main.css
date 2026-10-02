@@ -1,0 +1,689 @@
+@import './modules/data-table.css';
+@import './modules/info-grid.css';
+@import './modules/form-field.css';
+@import './modules/stats.css';
+@import './modules/create-form.css';
+@import './modules/drawer.css';
+@import './modules/section-filter.css';
+@import './modules/duplicate-dialog.css';
+@import './modules/tool-tip.css';
+@import './modules/toast.css';
+@import './modules/tag.css';
+@import './modules/button.css';
+@import './modules/placeholder-image.css';
+@import './modules/disabled.css';
+
+/* Supplemental color tokens (not in PrimeVue palette) */
+:root {
+    --app-color-heading: #334155;
+    --app-color-rule: #e2e8f0;
+}
+
+/* Shared auth card-swap transition * Used by every <Transition name="card-swap"> in the auth flow. * Paired with the useCardSwapTransition() composable for JS hooks. */
+.card-swap-enter-active,
+.card-swap-leave-active {
+    overflow: hidden;
+    transition:
+        height var(--p-transition-duration-slow) var(--p-transition-timing-ease-out),
+        opacity var(--p-transition-duration-slow) var(--p-transition-timing-ease-out);
+    will-change: height, opacity;
+
+    /* Reduced motion — which Chrome also reports under Battery Saver — keeps the
+       cross-fade and drops only the size change: a fade is what these users are
+       spared the motion of, not the feedback. Switching the transition off outright
+       made the card snap between states with nothing to read the change by.
+       useCardSwapTransition() reads these computed styles and skips its own height
+       animation when height isn't among them, so this rule is what decides. */
+    @media (prefers-reduced-motion: reduce) {
+        /* Nothing is being clipped once height is left alone, and the button spinner's
+           orbit needs room to overflow (see BaseSpinner). */
+        overflow: visible;
+        transition: opacity var(--p-transition-duration-normal) var(--p-transition-timing-ease-out);
+        will-change: opacity;
+    }
+}
+
+.card-swap-leave-active {
+    /* Fade the outgoing card out a touch faster than the incoming one fades in, so the
+       swap doesn't idle on an empty card in between. */
+    @media (prefers-reduced-motion: reduce) {
+        transition-duration: var(--p-transition-duration-fast);
+    }
+}
+html {
+    scrollbar-width: none;
+}
+html::-webkit-scrollbar {
+    display: none;
+}
+
+/* Per-user preference: directus_users.show_page_scrollbar = false hides every
+   scrollbar in the app — the custom page overlay (gated in default.vue) plus the
+   native / thin scrollbars on drawers, tables, the side nav, and popovers. The
+   class is toggled on <html>, so the descendant selectors also reach PrimeVue
+   overlays teleported to <body>. Scrolling still works (wheel, trackpad, keys);
+   only the visible bar is removed. Dropdown overlay lists are carved back out
+   below — they keep their bar in both preference states. */
+html.app-hide-scrollbars *,
+html.app-hide-scrollbars *::before,
+html.app-hide-scrollbars *::after {
+    scrollbar-width: none;
+}
+
+html.app-hide-scrollbars ::-webkit-scrollbar {
+    display: none;
+}
+
+/* Dropdown overlay panels (Select / MultiSelect / AutoComplete lists) always
+   keep a visible scrollbar — including under the hide-scrollbars preference
+   above. Option rows are uniform-height, so a clipped list can cut clean at a
+   row boundary and read as complete; the bar is the only reliable "there's
+   more" cue in a transient overlay. Thin styling mirrors the filter popovers
+   (BaseFilterToolbar / BaseFilterSection). */
+.p-select-list-container,
+.p-multiselect-list-container,
+.p-autocomplete-list-container {
+    scrollbar-width: thin;
+    scrollbar-color: var(--p-gray-100) transparent;
+}
+
+.p-select-list-container::-webkit-scrollbar,
+.p-multiselect-list-container::-webkit-scrollbar,
+.p-autocomplete-list-container::-webkit-scrollbar {
+    width: var(--p-spacing-2-25);
+}
+
+.p-select-list-container::-webkit-scrollbar-track,
+.p-multiselect-list-container::-webkit-scrollbar-track,
+.p-autocomplete-list-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.p-select-list-container::-webkit-scrollbar-thumb,
+.p-multiselect-list-container::-webkit-scrollbar-thumb,
+.p-autocomplete-list-container::-webkit-scrollbar-thumb {
+    background: var(--p-gray-100);
+    border-radius: var(--p-border-radius-sm);
+}
+
+/* Carve the overlay lists out of the hide-scrollbars blanket — these selectors
+   out-rank the universal rules above, restoring the thin bar. The filter
+   popover's option lists (BaseFilterSection — Account Manager, Customer Group,
+   Status, …) are the same uniform-row pattern and join the carve-out; their
+   thin styling lives in the component, only the un-hiding happens here. */
+html.app-hide-scrollbars .p-select-list-container,
+html.app-hide-scrollbars .p-multiselect-list-container,
+html.app-hide-scrollbars .p-autocomplete-list-container,
+html.app-hide-scrollbars .filter-section__option-list {
+    scrollbar-width: thin;
+}
+
+html.app-hide-scrollbars .p-select-list-container::-webkit-scrollbar,
+html.app-hide-scrollbars .p-multiselect-list-container::-webkit-scrollbar,
+html.app-hide-scrollbars .p-autocomplete-list-container::-webkit-scrollbar,
+html.app-hide-scrollbars .filter-section__option-list::-webkit-scrollbar {
+    display: block;
+}
+
+/* Drawn overlay scrollbar for touch platforms (app/utils/overlayScrollbar.ts).
+   iOS Safari paints no persistent bar for an overflow container — the rules
+   above are inert there, and the compositor indicator only flashes during a
+   swipe — so a dropdown that opens already overflowing reads as complete. The
+   JS above inserts this track/thumb pair into the overlay and drives its size
+   and offset from the scroll metrics.
+
+   No media query gates these rules: the elements exist only where
+   `getIsDrawnScrollbarPlatform()` passes (coarse primary pointer + overlay
+   scrollbars), so desktop and any classic-scrollbar platform never render one
+   and keep their native bar as the single indicator. Purely visual — both
+   layers are `pointer-events: none`, so touch scrolling stays the platform's
+   own on an unmodified container. */
+
+/* Stand the platform's own indicator down on any list carrying a drawn bar, so
+   the two can never paint at once. `overlay-scrollbar-host` is applied purely
+   from `createOverlayScrollbar`, which runs only behind the touch + overlay-
+   scrollbar gate — desktop never receives the class, so the thin native bar
+   configured above is untouched there. Hiding an indicator changes no layout
+   box and adds no scroll container: `overflow` stays exactly as authored and
+   native touch scrolling is unaffected.
+
+   Both `scrollbar-width` and `scrollbar-color` have to be neutralised, not just
+   the width: Safari 18.2 added support for the pair, so the `scrollbar-color`
+   the lists carry above paints a real gray-100 thumb on current iOS — a second
+   bar a few pixels from the drawn one. The `::-webkit-scrollbar` rules stay for
+   older iOS, which honours the pseudo-element but not the standard properties.
+
+   Each rule is duplicated under `html.app-hide-scrollbars` to match the
+   specificity of that carve-out further up (0,2,1). Without the duplicate, the
+   carve-out's `scrollbar-width: thin` out-ranks a bare class selector and the
+   native bar returns whenever the user's show_page_scrollbar preference is off. */
+.overlay-scrollbar-host,
+html.app-hide-scrollbars .overlay-scrollbar-host {
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
+}
+
+.overlay-scrollbar-host::-webkit-scrollbar,
+html.app-hide-scrollbars .overlay-scrollbar-host::-webkit-scrollbar {
+    display: none;
+}
+
+.overlay-scrollbar {
+    display: none;
+    position: absolute;
+    width: var(--p-spacing-1);
+    transform: translateX(calc(-100% - var(--p-spacing-0-5)));
+    z-index: 1;
+    pointer-events: none;
+}
+
+.overlay-scrollbar--visible {
+    display: block;
+}
+
+.overlay-scrollbar__thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--overlay-scrollbar-thumb-height, 0);
+    transform: translateY(var(--overlay-scrollbar-thumb-offset, 0));
+    background: var(--p-gray-100);
+    border-radius: var(--p-border-radius-sm);
+    pointer-events: none;
+}
+
+body {
+    font-family: var(--p-font-family);
+    font-size: var(--p-font-size-base);
+    font-weight: var(--p-font-weight-normal);
+    line-height: var(--p-font-line-height-normal);
+    background-color: var(--p-surface-50);
+    margin: 0;
+}
+
+.app-layout__content [id] {
+    scroll-margin-top: calc(
+        var(--p-spacing-16) + var(--p-spacing-4) + var(--p-spacing-8)
+    );
+}
+
+/* PrimeVue Select / MultiSelect — searchable dropdown filter input Override inputtext's larger paddingY (0.59rem) so the filter input matches the dropdown trigger control's height exactly. Replaces all per-component `:pt="{ pcFilter: { root: { style: 'height: 39px' } } }"` overrides. */
+.p-select-filter,
+.p-multiselect-filter {
+    padding-top: var(--p-spacing-2);
+    padding-bottom: var(--p-spacing-2);
+}
+
+/* PrimeVue Select: hover background only — no size/font changes */
+.p-select-clear-icon,
+.p-select-dropdown {
+    transition: background-color var(--p-transition-duration-fast);
+}
+
+.p-select-clear-icon {
+    color: var(--p-gray-400);
+    border-radius: var(--p-border-radius-xs);
+    /* 24px hit area + hover chip like the close button (BaseIconButton): a fixed
+       24px box with border-box padding scales the SVG to a 16px content area. */
+    box-sizing: border-box;
+    width: var(--p-spacing-6);
+    height: var(--p-spacing-6);
+    padding: var(--p-spacing-1);
+}
+
+.p-select-clear-icon:hover {
+    color: var(--p-skyblue-600);
+    background: var(--p-tideblue-50);
+}
+.p-select-dropdown {
+    position: relative;
+    isolation: isolate;
+}
+
+.p-select-dropdown::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: var(--p-spacing-6);
+    height: var(--p-spacing-6);
+    border-radius: var(--p-border-radius-xs);
+    background: transparent;
+    transition: background-color var(--p-transition-duration-fast);
+    z-index: -1;
+}
+
+.p-select-dropdown:hover {
+    color: var(--p-skyblue-600);
+}
+
+.p-select-dropdown:hover::before {
+    background: var(--p-tideblue-50);
+}
+
+/* Shared backdrop blur (sidebar, dialogs) */
+.app-backdrop-blur {
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+/* PrimeVue's mask only animates `background` (not `backdrop-filter`) on
+   enter/leave, so the blur "snaps" while the dim fades. Replace PrimeVue's
+   animations with versions that ride both properties together so the blur
+   eases in on open and eases out on close at the same speed. */
+.app-backdrop-blur.p-overlay-mask-enter-active {
+    animation: app-backdrop-enter var(--p-mask-transition-duration, 200ms) ease-out forwards !important;
+}
+
+.app-backdrop-blur.p-overlay-mask-leave-active {
+    animation: app-backdrop-leave var(--p-mask-transition-duration, 200ms) ease-out forwards !important;
+}
+
+@keyframes app-backdrop-enter {
+    from {
+        background: transparent;
+        backdrop-filter: blur(0);
+        -webkit-backdrop-filter: blur(0);
+    }
+    to {
+        background: rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(6px);
+    }
+}
+
+@keyframes app-backdrop-leave {
+    from {
+        background: rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(6px);
+    }
+    to {
+        background: transparent;
+        backdrop-filter: blur(0);
+        -webkit-backdrop-filter: blur(0);
+    }
+}
+
+/* Expand clickable hit area without shifting surrounding layout * Adds an invisible 32×32 tap target via ::after for legacy bare-icon call * sites. Migrated call sites use <BaseIconButton> which is already 32×32. */
+.icon-hit-area {
+    position: relative;
+    cursor: pointer;
+}
+.icon-hit-area::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: var(--p-spacing-8);
+    height: var(--p-spacing-8);
+}
+
+/* Shared interaction treatment for bare clickable `<i>` icons that can't be a
+   <BaseIconButton> (e.g. filter-toggle icons positioned inside an input). Pair
+   with `.icon-hit-area` to reuse its 32×32 ::after as the hover surface. Mirrors
+   BaseIconButton's interaction states: on hover/focus/active the icon goes
+   brand-blue on a light-blue rounded background. The RESTING colour is owned by
+   the call site (blue for primary actions, gray for secondary) and is preserved
+   — only the interaction state is applied here. */
+.icon-action {
+    cursor: pointer;
+    isolation: isolate;
+    transition: color var(--p-transition-duration-normal) var(--p-transition-timing-ease-out);
+}
+
+.icon-action.icon-hit-area::after {
+    border-radius: var(--p-border-radius-xs);
+    background: transparent;
+    transition: background var(--p-transition-duration-normal) var(--p-transition-timing-ease-out);
+    z-index: -1;
+}
+
+.icon-action:hover,
+.icon-action:focus-visible,
+.icon-action:active {
+    color: var(--p-skyblue-600);
+}
+
+.icon-action.icon-hit-area:hover::after,
+.icon-action.icon-hit-area:focus-visible::after,
+.icon-action.icon-hit-area:active::after {
+    background: var(--p-tideblue-50);
+}
+
+/* iOS Safari zooms the viewport when a focused control's text is under 16px,
+   and there is no way to decline the zoom other than not being under 16px. Every
+   text control sizes itself from this one variable so a local override can't
+   quietly reintroduce the problem: 16px on phones, the design's 14px from tablet
+   up, where no zoom happens. */
+:root {
+    --app-input-font-size: var(--p-font-size-base);
+
+    @media (min-width: 768px) {
+        --app-input-font-size: var(--p-font-size-sm);
+    }
+}
+
+/* Prevent iOS auto-zoom on input focus */
+.p-inputtext,
+.p-textarea,
+.p-password-input,
+.p-inputnumber-input,
+.p-select-label,
+.p-multiselect-label,
+.p-autocomplete-input,
+.p-datepicker-input,
+.p-inputmask,
+.p-inputotp-input,
+.p-chips-input,
+.p-treeselect-label {
+    font-size: var(--app-input-font-size) !important;
+}
+
+.p-button-sm > .pi,
+.p-button-sm > .app-nav-icon-svg {
+    font-size: var(--p-font-size-sm);
+}
+
+.p-button:has(.base-spinner) {
+    position: relative;
+    opacity: 1;
+    overflow: visible !important;
+    box-shadow: none !important;
+    outline-color: transparent !important;
+}
+
+.p-select.p-disabled:has(.base-spinner) {
+    position: relative;
+    opacity: 1 !important;
+}
+
+.p-button:has(.base-spinner)::after,
+.p-select.p-disabled:has(.base-spinner)::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: var(--p-surface-0);
+    opacity: calc(1 - var(--p-disabled-opacity));
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Descendant (not direct child): some buttons wrap the spinner in an icon span
+   (e.g. "Next Step"), so `> .base-spinner` would miss it and leave it under the veil. */
+.p-button:has(.base-spinner) .base-spinner,
+.p-select.p-disabled:has(.base-spinner) .base-spinner {
+    position: relative;
+    z-index: 2;
+}
+
+.info-note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--p-spacing-1-75);
+    margin: 0 0 var(--p-spacing-3);
+    padding: var(--p-spacing-1-75) var(--p-spacing-2-625);
+    background: var(--p-skyblue-50);
+    border: 1px solid var(--p-skyblue-200);
+    border-radius: var(--p-border-radius-xs);
+    box-shadow: var(--p-shadow-xs);
+    color: var(--p-skyblue-600);
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-semibold);
+    line-height: var(--p-spacing-5);
+}
+
+.info-note .pi {
+    flex-shrink: 0;
+    line-height: var(--p-spacing-5);
+    color: var(--p-skyblue-600);
+    font-size: var(--p-font-size-sm);
+}
+
+/* Accessible visually-hidden utility: removes an element from sight while keeping
+   it in the accessibility tree and clickable (used to hide native file inputs
+   behind a styled trigger). Shared by the customer/supplier/manufacturer logo
+   uploads. */
+.visually-hidden {
+    position: absolute;
+    width: var(--p-spacing-px);
+    height: var(--p-spacing-px);
+    padding: 0;
+    margin: calc(var(--p-spacing-px) * -1);
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Rank column — the pill is centered in its cell so it reads as one column of
+   badges rather than a ragged left edge. Applied via the Column `body-class` on
+   every table that ranks rows (manufacturer suppliers, supplier manufacturers). */
+.rank-col {
+    text-align: center;
+}
+
+/* Rank pill — a true circle at every rank: width and height are the same fixed
+   28px, never min-width + padding, so a wider number can't stretch it into an
+   oval. 28px reads well at one or two digits (the common case) and leaves three
+   digits — the outlier — a little breathing room inside the border.
+   Monospace + tabular-nums so the digits sit on a fixed grid down the column. */
+.rank-pill {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--p-spacing-7);
+    height: var(--p-spacing-7);
+    padding: 0;
+    flex-shrink: 0;
+    border-radius: var(--p-border-radius-full);
+    border: 1px solid var(--p-gray-200);
+    /* body-sm-mono/regular */
+    font-family: var(--p-mono-family);
+    font-size: var(--p-font-size-xs);
+    font-weight: var(--p-font-weight-medium);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--p-gray-800);
+    text-align: center;
+}
+
+/* ── Prompt dialog ──────────────────────────────────────────────────────────
+   Chrome and layout shared by AppUpdateBanner (the release-notes modal) and
+   DialogRefreshPrompt (the simple refresh card, used by both the "new version"
+   prompt and the Cloudflare Access session warning). Both render a
+   `.update-dialog`, so these live here rather than in either component — moved
+   verbatim from AppUpdateBanner when the card was extracted. */
+.update-dialog__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-spacing-3);
+    /* Fill the dialog-content height so the loading spinner can grow into
+       the remaining space below the version header. */
+    min-height: 100%;
+}
+
+.update-dialog__heading {
+    margin: 0;
+    font-size: var(--p-font-size-xl);
+    font-weight: var(--p-font-weight-bold);
+    color: var(--p-deepblue-900);
+    line-height: var(--p-line-height-tight);
+}
+
+.update-dialog__update {
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-spacing-4);
+}
+
+.update-dialog__logo {
+    width: 80px;
+    height: auto;
+    margin-bottom: calc(var(--p-spacing-4) * 0.2);
+}
+
+.update-dialog__actions {
+    display: flex;
+    justify-content: center;
+    gap: var(--p-spacing-2);
+    width: 100%;
+}
+
+.update-dialog,
+.update-dialog .p-dialog-header,
+.update-dialog .p-dialog-content,
+.update-dialog .p-dialog-footer {
+    border-radius: var(--p-border-radius-sm) !important;
+}
+
+.update-dialog .p-dialog-footer {
+    min-height: var(--p-spacing-12) !important;
+    padding: var(--p-spacing-2) var(--p-spacing-4-375) var(--p-spacing-8) !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+/* Gap above the version-pill row ONLY (the release-notes modal). The simple
+   refresh prompt keeps its buttons close to the message. */
+.update-dialog .p-dialog-footer:has(.update-dialog__version-nav) {
+    margin-top: var(--p-spacing-6) !important;
+}
+
+/* Version Details modal has no footer buttons (just a spacer), so drop the
+   min-height — the bottom space is then exactly spacing-8 below the content,
+   matching the other two modals. */
+.update-dialog .p-dialog-footer:has(.update-dialog__footer-spacer) {
+    min-height: 0 !important;
+    padding: 0 var(--p-spacing-4-375) var(--p-spacing-8) !important;
+}
+
+.update-dialog .p-dialog-header {
+    height: var(--p-spacing-8) !important;
+    padding-top: 0 !important;
+    padding-right: var(--p-spacing-4-375) !important;
+    padding-left: var(--p-spacing-4-375) !important;
+    padding-bottom: 0 !important;
+}
+
+/* The close button is a 32px box around a 16px glyph, so the ✕ itself lands 8px
+   inside the header's gutter while the body content and the version pills sit ON
+   it. Pull the button out by that 8px: the glyph then aligns with everything else
+   down the right edge, and its hover disc still sits inside the dialog. */
+.update-dialog .p-dialog-close-button {
+    margin-right: calc(var(--p-spacing-2) * -1);
+}
+
+/* The "Not Now" action button is borderless — but NOT the version pills, which
+   keep their gray outline at all times. */
+.update-dialog .p-dialog-footer .p-button-secondary:not(.update-dialog__version-pill-btn) {
+    border-color: transparent;
+}
+
+/* 32×32 hit area / hover chip around the 16px glyph — PrimeVue's default button
+   box is larger, which made both the tap target and the hover wash outsized for
+   a header icon. Fixed width + height (border-box) keeps it square. */
+.update-dialog .p-dialog-close-button,
+.update-dialog .p-dialog-header-icon {
+    box-sizing: border-box;
+    width: var(--p-spacing-8) !important;
+    height: var(--p-spacing-8) !important;
+    min-width: var(--p-spacing-8) !important;
+    padding: var(--p-spacing-2) !important;
+    border: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    position: relative;
+    top: var(--p-spacing-3);
+}
+
+.update-dialog .p-dialog-close-button:focus,
+.update-dialog .p-dialog-close-button:focus-visible,
+.update-dialog .p-dialog-header-icon:focus,
+.update-dialog .p-dialog-header-icon:focus-visible {
+    outline: 0 !important;
+    box-shadow: none !important;
+}
+
+.update-dialog .p-dialog-close-button:focus:not(:focus-visible),
+.update-dialog .p-dialog-header-icon:focus:not(:focus-visible) {
+    background: transparent !important;
+}
+
+.update-dialog .p-dialog-close-button:hover,
+.update-dialog .p-dialog-header-icon:hover {
+    background: var(--p-tideblue-50) !important;
+    border-radius: var(--p-border-radius-xs) !important;
+}
+
+/* Lock the dialog as a flex column so the header / footer stay fixed and
+   only the content area scrolls. Combined with a fixed height on the
+   dialog root, this prevents the modal from resizing when release
+   notes finish loading. */
+.update-dialog.p-dialog {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.update-dialog .p-dialog-header {
+    flex: 0 0 auto;
+}
+
+.update-dialog .p-dialog-footer {
+    flex: 0 0 auto;
+}
+
+.update-dialog .p-dialog-content {
+    /* The body scrolls with a visible (thin) scrollbar. `scrollbar-gutter: stable`
+       reserves the 6px bar strip INSIDE the padding box, on top of the right
+       padding — left read 17.5px, right 23.5px. Deduct the strip from the right
+       padding so the content sits on the same 17.5px gutter on BOTH sides as the
+       header and footer, with the bar living in the reserved strip beyond it. */
+    padding: 0 calc(var(--p-spacing-4-375) - var(--p-spacing-1-5)) 0 var(--p-spacing-4-375) !important;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    /* Reserved always, so the content doesn't reflow horizontally when the notes
+       load and the bar appears. */
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--p-surface-300) transparent;
+}
+
+/* 6px bar — matches the strip deducted from the padding above. */
+.update-dialog .p-dialog-content::-webkit-scrollbar {
+    width: var(--p-spacing-1-5);
+}
+
+.update-dialog .p-dialog-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.update-dialog .p-dialog-content::-webkit-scrollbar-thumb {
+    background: var(--p-surface-300);
+    border-radius: var(--p-border-radius-sm);
+}
+
+.update-dialog .p-dialog-content::-webkit-scrollbar-thumb:hover {
+    background: var(--p-surface-400);
+}
+.avatar-logo-image {
+    width: calc(100% * var(--logo-fit, 1));
+    height: calc(100% * var(--logo-fit, 1));
+    object-fit: contain;
+}
+
+/* The fit is only known once the image has decoded, so the artwork is held back
+   until then — otherwise it paints at the full box for a frame and then snaps.
+   `visibility`, not `display`: the avatar's box (and everything around it) stays
+   exactly where it is while the logo is measured. */
+.avatar-logo-image--measuring {
+    visibility: hidden;
+}

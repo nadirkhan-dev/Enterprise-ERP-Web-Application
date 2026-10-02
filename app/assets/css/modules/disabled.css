@@ -1,0 +1,35 @@
+/* Disabled cursor — the single place that turns "this control is off" into a
+   `not-allowed` pointer, for every button and field in the app.
+
+   PrimeVue's base stylesheet sets `pointer-events: none` on `.p-disabled` and
+   every descendant. An element that takes no pointer events never gets to paint
+   its own cursor — the pointer falls through to whatever sits underneath and
+   that supplies the arrow instead — so the events have to come back before
+   `not-allowed` can render.
+
+   Restoring them changes nothing but the cursor here:
+   - native controls (`button`, `input`, `select`, `textarea`) dispatch no click
+     at all while the `disabled` attribute is set;
+   - the widget roots below are plain elements, but each guards its own handlers
+     on the `disabled` prop (Select / MultiSelect / AutoComplete all return early
+     in `onContainerClick`), and their descendants keep PrimeVue's
+     `pointer-events: none`, which makes the root the hit target. `cursor` is an
+     inherited property, so the whole control still reads as not-allowed.
+
+   Menu items (ContextMenu / Menu / PanelMenu) are deliberately left out: PrimeVue
+   runs their `command` callback unguarded and relies on `pointer-events: none`
+   alone to make a disabled item inert. */
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+fieldset:disabled,
+.p-button:disabled,
+.p-select.p-disabled,
+.p-multiselect.p-disabled,
+.p-autocomplete.p-disabled,
+.p-inputnumber.p-disabled,
+.p-datepicker.p-disabled {
+    cursor: not-allowed;
+    pointer-events: auto;
+}

@@ -1,0 +1,121 @@
+
+.p-button:disabled,
+.p-button.p-disabled {
+    background: var(--p-gray-100);
+    border-color: var(--p-gray-100);
+    color: var(--p-gray-500);
+    opacity: var(--p-opacity-70);
+}
+
+/* Text and link variants have no fill to grey out — greying it would invent a
+   button shape where the design has none. Only the label/icon goes grey. */
+.p-button.p-button-text:disabled,
+.p-button.p-button-text.p-disabled,
+.p-button.p-button-link:disabled,
+.p-button.p-button-link.p-disabled {
+    background: transparent;
+    border-color: transparent;
+    color: var(--p-gray-500);
+}
+
+/* Outlined keeps its outline, greyed rather than tinted. */
+.p-button.p-button-outlined:disabled,
+.p-button.p-button-outlined.p-disabled {
+    background: transparent;
+    border-color: var(--p-gray-200);
+    color: var(--p-gray-500);
+}
+
+/* Icons inherit via currentColor, but PrimeVue sets an explicit colour on the
+   label in some variants — pin both to the disabled grey. */
+.p-button:disabled .p-button-label,
+.p-button.p-disabled .p-button-label,
+.p-button:disabled .p-button-icon,
+.p-button.p-disabled .p-button-icon {
+    color: inherit;
+}
+
+/* Segmented control (SelectButton) — gray track, white selected pill with a
+   skyblue label + icon (Figma togglebutton tokens). Radius is border-radius-xs
+   (2px) per the design; everything else is PrimeVue's default geometry.
+   Shared by the shipping estimator's Parcel/LTL toggles and the activity
+   drawer's Inbound/Outbound toggle. */
+.method-toggle.p-selectbutton {
+    display: inline-flex;
+    gap: var(--p-spacing-0-5);
+    padding: var(--p-spacing-1);
+    background: var(--p-gray-50);
+    border: 0;
+    border-radius: var(--p-border-radius-xs);
+}
+
+.method-toggle .p-togglebutton {
+    border: 0;
+    background: transparent;
+    color: var(--p-gray-800);
+    border-radius: var(--p-border-radius-xs);
+}
+
+.method-toggle .p-togglebutton::before {
+    display: none;
+}
+
+.method-toggle .p-togglebutton-content {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--p-spacing-1-75);
+    background: transparent;
+    box-shadow: none;
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-semibold);
+}
+
+.method-toggle .p-togglebutton:hover {
+    background: transparent;
+    color: var(--p-deepblue-900);
+}
+
+/* Unavailable option — e.g. Parcel above the LTL-only weight. The pill stays
+   flat and the label + glyph drop to the design's disabled grey. The base rule
+   above out-specifies PrimeVue's own `:disabled` colours, so restate them. */
+.method-toggle .p-togglebutton:disabled,
+.method-toggle .p-togglebutton:disabled:hover {
+    background: transparent;
+    color: var(--p-gray-100);
+    cursor: not-allowed;
+}
+
+.method-toggle .p-togglebutton-checked,
+.method-toggle .p-togglebutton-checked:hover {
+    background: var(--p-surface-0);
+    color: var(--p-skyblue-600);
+    box-shadow: var(--p-shadow-xs);
+}
+
+.method-toggle .p-togglebutton-checked i,
+.method-toggle .p-togglebutton-checked .app-nav-icon-svg {
+    color: inherit;
+    fill: currentColor;
+}
+
+/* Selected *and* disabled — e.g. the activity drawer in read-only mode, where
+   the whole control is inert but the chosen direction still has to read as the
+   record's value. The selected shape (white pill + shadow) is kept so the
+   choice stays visible; the label drops to the same disabled grey every other
+   disabled button uses. Same specificity as the flat `:disabled` rule above,
+   so it must stay below it. */
+.method-toggle .p-togglebutton-checked:disabled,
+.method-toggle .p-togglebutton-checked:disabled:hover {
+    background: var(--p-surface-0);
+    color: var(--p-gray-500);
+    box-shadow: var(--p-shadow-xs);
+}
+
+.method-toggle .p-togglebutton-checked:disabled .p-togglebutton-icon {
+    color: inherit;
+}
+
+.method-toggle .p-togglebutton-content .pi {
+    font-size: var(--p-font-size-sm);
+}

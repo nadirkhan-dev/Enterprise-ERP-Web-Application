@@ -1,0 +1,465 @@
+name: Deploy to Production
+on:
+  push:
+    branches:
+      - prod
+  # Manual re-deploys (e.g. after fixing an environment secret) without an
+  # empty commit. Note: rollback has no previous-push SHA on manual runs.
+  workflow_dispatch:
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+permissions:
+  contents: write       # push prod-v* release tags
+  packages: write       # push Docker image to ghcr.io
+  pull-requests: read   # gh pr list for release-notes.json
+env:
+  # The same COMPOSE_APP_IMAGE/COMPOSE_APP_VERSION the compose file pulls, so what is built is
+  # what is deployed. No fallbacks: the render step below fails first if a variable is unset,
+  # before any of these is used. IMAGE_TAG is the moving tag compose pulls — NOT the app's
+  # release version, which is computed per-release below and tracked as a prod-v* git tag.
+  IMAGE: ${{ vars.COMPOSE_APP_IMAGE }}
+  IMAGE_TAG: ${{ vars.COMPOSE_APP_VERSION }}
+  DEPLOY_PATH: /opt/stacks/connect-prod
+  HEALTH_PORT: ${{ vars.COMPOSE_APP_PORT }}
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      # Prod owns its own version line, tracked as prod-v* git tags — NOT
+      # package.json, whose version belongs to dev and advances on every dev
+      # deploy (inheriting it would make one prod release jump by however many
+      # dev deploys it bundles). One bump per prod release: minor if the
+      # release contains any "feat: " commit, patch otherwise — mirroring
+      # dev's rule. Major bumps are never automatic. The computed version is
+      # written into the WORKSPACE package.json only (never committed) so the
+      # build bakes it into public.appVersion; the tag pushed after a
+      # successful deploy is the durable record, so nothing here can ever
+      # conflict with a dev -> prod merge.
+      - name: Determine production version and write version.json
+        run: |
+          # Re-deploying an already-released commit (workflow_dispatch) reuses
+          # its version instead of minting a new one.
+          EXISTING_TAG=$(git tag --points-at HEAD 'prod-v*' | sort -V | tail -1)
+          if [ -n "$EXISTING_TAG" ]; then
+            VERSION="${EXISTING_TAG#prod-v}"
+            echo "TAG_EXISTS=true" >> "$GITHUB_ENV"
+          else
+            LAST_TAG=$(git tag -l 'prod-v*' | sort -V | tail -1)
+            if [ -z "$LAST_TAG" ]; then
+              # First production release ever.
+              VERSION="1.0.0"
+            else
+              LAST="${LAST_TAG#prod-v}"
+              MAJOR=$(echo "$LAST" | cut -d. -f1)
+              MINOR=$(echo "$LAST" | cut -d. -f2)
+              PATCH=$(echo "$LAST" | cut -d. -f3)
+              if git log --format=%s "${LAST_TAG}..HEAD" | grep -qE "^feat: "; then
+                MINOR=$((MINOR + 1))
+                PATCH=0
+              else
+                PATCH=$((PATCH + 1))
+              fi
+              VERSION="$MAJOR.$MINOR.$PATCH"
+            fi
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "Production version: ${VERSION}"
+
+          # Replace only the first "version": "..." occurrence (the top-level
+          # package field) — workspace-only, so the client shows the prod
+          # version while package.json in git stays dev's.
+          sed -i '0,/"version": *"[^"]*"/{s//"version": "'"$VERSION"'"/;}' package.json
+          echo "{\"id\":\"${{ github.sha }}\",\"version\":\"${VERSION}\"}" > public/version.json
+
+      # Release PRs (dev -> prod) only appear here if their body has a
+      # "## Changes" section with "- " bullets — same contract as dev PRs.
+      - name: Generate release-notes.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr list --base prod --state merged --limit 15 \
+            --json mergeCommit,body,mergedAt \
+            --jq '
+              [ .[] | select(.body | test("## Changes")) |
+                {
+                  version: .mergeCommit.oid,
+                  merged: .mergedAt,
+                  changes: [
+                    .body
+                    | split("## Changes")[1]
+                    | split("## ")[0]
+                    | split("\n")[]
+                    | select(test("^\\s*- ."))
+                    | ltrimstr(" ") | ltrimstr("- ")
+                    | gsub("\\r"; "")
+                    | select(length > 0)
+                  ]
+                }
+              | select(.changes | length > 0)
+              ]
+            ' > public/release-notes.json || echo "[]" > public/release-notes.json
+
+          # Every prior release's merge commit carries the prod-v* tag pushed
+          # by its deploy, so older entries map SHA -> tag directly. The
+          # newest entry is THIS release — its tag doesn't exist yet, so it
+          # gets the VERSION computed above.
+          for SHA in $(grep -o '"version":"[a-f0-9]\{40\}"' public/release-notes.json | cut -d'"' -f4); do
+            TAG=$(git tag --points-at "$SHA" 'prod-v*' | sort -V | tail -1)
+            if [ -n "$TAG" ]; then
+              sed -i "s|${SHA}|${TAG#prod-v}|" public/release-notes.json
+            elif [ "$SHA" = "${{ github.sha }}" ]; then
+              sed -i "s|${SHA}|${VERSION}|" public/release-notes.json
+            fi
+          done
+
+      # The prod stack is configured the same way the dev stack is: a .env beside the compose
+      # file, read BOTH for ${...} interpolation of the compose file itself and as the
+      # container's env_file. Nothing on the host is hand-maintained — this step rewrites the
+      # file from the `production` environment on every deploy, so rotating a credential stays
+      # "update the secret, re-run the workflow".
+      #
+      # It runs BEFORE the build so a misconfigured environment costs a few seconds instead of
+      # an image build, a GHCR push, and a recreated container that crash-loops.
+      - name: Install compose file and render .env
+        env:
+          # Stack identity — not secret, so these are environment VARIABLES. The gate below
+          # requires every one, so what production runs is what the environment says. The
+          # compose file also carries :-defaults matching these values, which only apply to a
+          # hand-run `docker compose up` on the host — a deploy never reaches them.
+          COMPOSE_APP_CONTAINER_NAME: ${{ vars.COMPOSE_APP_CONTAINER_NAME }}
+          COMPOSE_APP_IMAGE: ${{ vars.COMPOSE_APP_IMAGE }}
+          COMPOSE_APP_VERSION: ${{ vars.COMPOSE_APP_VERSION }}
+          COMPOSE_APP_PORT: ${{ vars.COMPOSE_APP_PORT }}
+          COMPOSE_APP_CPUS: ${{ vars.COMPOSE_APP_CPUS }}
+          COMPOSE_APP_MEM_LIMIT: ${{ vars.COMPOSE_APP_MEM_LIMIT }}
+          COMPOSE_APP_MEM_RESERVATION: ${{ vars.COMPOSE_APP_MEM_RESERVATION }}
+          COMPOSE_APP_LOGGING_MAX_SIZE: ${{ vars.COMPOSE_APP_LOGGING_MAX_SIZE }}
+          COMPOSE_APP_LOGGING_MAX_FILE: ${{ vars.COMPOSE_APP_LOGGING_MAX_FILE }}
+          COMPOSE_NETWORK_NAME: ${{ vars.COMPOSE_NETWORK_NAME }}
+          # Second external network, whichever one the prod `servicemaster-prod` container is on,
+          # so Nitro reaches sibling containers by name over the Docker bridge instead of going
+          # out to Cloudflare and back. That is `supplyhub` — shared with the prod Directus —
+          # the same arrangement deploy.yml uses with `supplyhubdev`. Declared here rather than
+          # attached with `docker network connect`, which the next --force-recreate would undo.
+          COMPOSE_SERVICEMASTER_NETWORK_NAME: ${{ vars.COMPOSE_SERVICEMASTER_NETWORK_NAME }}
+          PORT: ${{ vars.PORT }}
+          # Runtime config. Several secrets are stored WITHOUT the NUXT_ prefix that
+          # runtimeConfig requires, so the mapping happens here rather than in the compose file.
+          NUXT_DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          NUXT_LOOKER_BASE_URL: ${{ secrets.NUXT_LOOKER_BASE_URL }}
+          NUXT_LOOKER_CLIENT_ID: ${{ secrets.NUXT_LOOKER_CLIENT_ID }}
+          NUXT_LOOKER_CLIENT_SECRET: ${{ secrets.NUXT_LOOKER_CLIENT_SECRET }}
+          NUXT_SAP_SERVICE_LAYER_URL: ${{ secrets.NUXT_SAP_SERVICE_LAYER_URL }}
+          NUXT_SAP_COMPANY_DB: ${{ secrets.NUXT_SAP_COMPANY_DB }}
+          NUXT_SAP_USERNAME: ${{ secrets.NUXT_SAP_USERNAME }}
+          NUXT_SAP_PASSWORD: ${{ secrets.NUXT_SAP_PASSWORD }}
+          NUXT_SAP_ALLOW_SELF_SIGNED_CERT: ${{ secrets.NUXT_SAP_ALLOW_SELF_SIGNED_CERT }}
+          DIRECTUS_URL: ${{ secrets.DIRECTUS_URL }}
+          NUXT_DIRECTUS_TOKEN: ${{ secrets.DIRECTUS_TOKEN }}
+          NUXT_FEDEX_API_KEY: ${{ secrets.NUXT_FEDEX_API_KEY }}
+          NUXT_FEDEX_SECRET_KEY: ${{ secrets.NUXT_FEDEX_SECRET_KEY }}
+          NUXT_FEDEX_SHIPPER_ACCOUNT: ${{ secrets.NUXT_FEDEX_SHIPPER_ACCOUNT }}
+          NUXT_FEDEX_ACCOUNT: ${{ secrets.NUXT_FEDEX_ACCOUNT }}
+          NUXT_FEDEX_BILL_TO_ACCOUNT: ${{ secrets.NUXT_FEDEX_BILL_TO_ACCOUNT }}
+          NUXT_FEDEX_ENV: ${{ secrets.NUXT_FEDEX_ENV }}
+          NUXT_UPS_CLIENT_ID: ${{ secrets.NUXT_UPS_CLIENT_ID }}
+          NUXT_UPS_CLIENT_SECRET: ${{ secrets.NUXT_UPS_CLIENT_SECRET }}
+          NUXT_UPS_SHIPPER_NUMBER: ${{ secrets.NUXT_UPS_SHIPPER_NUMBER }}
+          NUXT_UPS_ENV: ${{ secrets.NUXT_UPS_ENV }}
+          # Priority1 LTL broker. The URL differs per environment (dev-api vs api),
+          # so it is configured rather than derived; accepted from Variables or
+          # Secrets since it is a URL, not a credential.
+          NUXT_PRIORITY_ONE_API_URL: ${{ vars.NUXT_PRIORITY_ONE_API_URL || secrets.NUXT_PRIORITY_ONE_API_URL }}
+          NUXT_PRIORITY_ONE_API_KEY: ${{ secrets.NUXT_PRIORITY_ONE_API_KEY }}
+          NUXT_SQUARE_ACCESS_TOKEN: ${{ secrets.NUXT_SQUARE_ACCESS_TOKEN }}
+          NUXT_OPENAI_API_KEY: ${{ secrets.NUXT_OPENAI_API_KEY }}
+          NUXT_PDF_DOWNLOAD_SERVICE_URL: ${{ secrets.PDF_DOWNLOAD_SERVICE_URL }}
+          NUXT_PDF_DOWNLOAD_SERVICE_USER_NAME: ${{ secrets.PDF_DOWNLOAD_SERVICE_USER_NAME }}
+          NUXT_PDF_DOWNLOAD_SERVICE_USER_PASS: ${{ secrets.PDF_DOWNLOAD_SERVICE_USER_PASS }}
+          NUXT_TURNSTILE_SECRET_KEY: ${{ secrets.NUXT_TURNSTILE_SECRET_KEY }}
+          NUXT_MS_FORM_RESPONSES_URL: ${{ secrets.NUXT_MS_FORM_RESPONSES_URL }}
+          NUXT_SERVICEMASTER_WS_URL: ${{ secrets.NUXT_SERVICEMASTER_WS_URL }}
+          NUXT_SERVICEMASTER_API_KEY: ${{ secrets.NUXT_SERVICEMASTER_API_KEY }}
+          NUXT_CF_ACCESS_CLIENT_ID: ${{ secrets.NUXT_CF_ACCESS_CLIENT_ID }}
+          NUXT_CF_ACCESS_CLIENT_SECRET: ${{ secrets.NUXT_CF_ACCESS_CLIENT_SECRET }}
+          NUXT_PUBLIC_PASSWORD_RESET_URL: ${{ vars.NUXT_PUBLIC_PASSWORD_RESET_URL || secrets.NUXT_PUBLIC_PASSWORD_RESET_URL }}
+          # Emitted into the host .env below as well as passed as a build arg, so the
+          # socket URL can change with a redeploy instead of only with a rebuild. Both
+          # paths read the same secret, so the bundle and the container never disagree.
+          NUXT_PUBLIC_DIRECTUS_WEBSOCKET_URL: ${{ secrets.DIRECTUS_WEBSOCKET_URL }}
+          NUXT_ASANA_ACCESS_TOKEN: ${{ secrets.NUXT_ASANA_ACCESS_TOKEN }}
+          NUXT_ASANA_PROJECT_GID: ${{ secrets.NUXT_ASANA_PROJECT_GID }}
+          NUXT_ASANA_BACKLOG_SECTION_GID: ${{ secrets.NUXT_ASANA_BACKLOG_SECTION_GID }}
+          NUXT_ASANA_FEATURE_REQUEST_TAG_GID: ${{ secrets.NUXT_ASANA_FEATURE_REQUEST_TAG_GID }}
+          NUXT_ASANA_BUG_REPORT_TAG_GID: ${{ secrets.NUXT_ASANA_BUG_REPORT_TAG_GID }}
+          NUXT_ASANA_STATUS_FIELD_GID: ${{ secrets.NUXT_ASANA_STATUS_FIELD_GID }}
+          NUXT_ASANA_BACKLOG_STATUS_OPTION_GID: ${{ secrets.NUXT_ASANA_BACKLOG_STATUS_OPTION_GID }}
+          NUXT_ASANA_TASK_TYPE_GID: ${{ secrets.NUXT_ASANA_TASK_TYPE_GID }}
+          NUXT_ASANA_TASK_TYPE_BACKLOG_STATUS_GID: ${{ secrets.NUXT_ASANA_TASK_TYPE_BACKLOG_STATUS_GID }}
+        run: |
+          # Variables and secrets live in different tabs of the environment's settings page, so
+          # they are reported separately — the error should say where to go, not just what.
+          missing=0
+          for key in COMPOSE_APP_CONTAINER_NAME COMPOSE_APP_IMAGE COMPOSE_APP_VERSION \
+                     COMPOSE_APP_PORT COMPOSE_APP_CPUS COMPOSE_APP_MEM_LIMIT \
+                     COMPOSE_APP_MEM_RESERVATION COMPOSE_APP_LOGGING_MAX_SIZE \
+                     COMPOSE_APP_LOGGING_MAX_FILE COMPOSE_NETWORK_NAME \
+                     COMPOSE_SERVICEMASTER_NETWORK_NAME PORT; do
+            if [ -z "$(printenv "$key" || true)" ]; then
+              echo "::error::The production environment is missing variable: $key"
+              missing=1
+            fi
+          done
+
+          # A missing core credential leaves the app running but unable to reach Directus or
+          # SAP. Feature-scoped keys (Looker, FedEx, UPS, Square, Asana) are deliberately NOT
+          # gated: their absence degrades one panel rather than breaking the app.
+          for key in DIRECTUS_URL NUXT_DIRECTUS_TOKEN NUXT_DEPLOY_TOKEN \
+                     NUXT_SAP_SERVICE_LAYER_URL NUXT_SAP_COMPANY_DB \
+                     NUXT_SAP_USERNAME NUXT_SAP_PASSWORD; do
+            if [ -z "$(printenv "$key" || true)" ]; then
+              echo "::error::The production environment is missing secret: $key"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+          mkdir -p "$DEPLOY_PATH"
+          # Same ownership trap as the .env below: overwriting an existing file needs write
+          # permission on the FILE, creating one needs it on the DIRECTORY, and neither is
+          # guaranteed when the path was first set up by hand as another user. Remove first so
+          # the runner owns what it writes; if even that is refused, say exactly what to fix
+          # rather than failing with a bare "Permission denied".
+          rm -f "$DEPLOY_PATH/compose.yaml" 2>/dev/null || true
+          if ! cp docker/compose.prod.yaml "$DEPLOY_PATH/compose.yaml" 2>/dev/null; then
+            echo "::error::Cannot write $DEPLOY_PATH/compose.yaml as $(id -un). On the host: sudo chown -R $(id -un):$(id -gn) $DEPLOY_PATH"
+            exit 1
+          fi
+
+          ENV_FILE="$DEPLOY_PATH/.env"
+          # Remove before writing rather than truncating in place. Redirecting into an existing
+          # file needs only write permission, so an .env left on the host by an earlier manual
+          # setup keeps its original owner — and chmod then fails with EPERM, because changing a
+          # mode requires ownership. Recreating makes the runner the owner; umask 077 means it
+          # is born 600, so the chmod below is a belt-and-braces check rather than the only
+          # thing standing between the credentials and a world-readable file.
+          rm -f "$ENV_FILE" || true
+          umask 077
+          {
+            echo "# Generated by .github/workflows/deploy-prod.yml — rewritten on every deploy."
+            echo "# Do not edit on the host: change the value in the production GitHub"
+            echo "# environment and re-run the workflow."
+          } > "$ENV_FILE"
+
+          # Values are double-quoted with \ " and $ escaped. compose's dotenv reader unescapes
+          # exactly those at parse time, so the value reaches both the interpolation pass and
+          # the container byte-for-byte as stored — single quotes, "#", "$" and newlines all
+          # survive. The single-quoted form cannot represent a single quote at all, which broke
+          # NUXT_MS_FORM_RESPONSES_URL: the Forms API addresses a form by OData key, so the URL
+          # genuinely contains them — .../forms('<id>')/responses. Escaping $ is what stops
+          # "?a=$X" being silently expanded to "?a=".
+          emit() {
+            value="$(printenv "$1" || true)"
+            # Unset stays unset: an empty value would override the runtimeConfig default in
+            # nuxt.config.ts, where an absent one lets it apply.
+            [ -n "$value" ] || return 0
+            printf '%s="%s"\n' "$1" \
+              "$(printf '%s' "$value" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\$/\\$/g')" >> "$ENV_FILE"
+          }
+
+          for key in COMPOSE_APP_CONTAINER_NAME COMPOSE_APP_IMAGE COMPOSE_APP_VERSION \
+                     COMPOSE_APP_PORT COMPOSE_APP_CPUS COMPOSE_APP_MEM_LIMIT \
+                     COMPOSE_APP_MEM_RESERVATION COMPOSE_APP_LOGGING_MAX_SIZE \
+                     COMPOSE_APP_LOGGING_MAX_FILE COMPOSE_NETWORK_NAME \
+                     COMPOSE_SERVICEMASTER_NETWORK_NAME PORT \
+                     NUXT_DEPLOY_TOKEN \
+                     NUXT_LOOKER_BASE_URL NUXT_LOOKER_CLIENT_ID NUXT_LOOKER_CLIENT_SECRET \
+                     NUXT_SAP_SERVICE_LAYER_URL NUXT_SAP_COMPANY_DB NUXT_SAP_USERNAME \
+                     NUXT_SAP_PASSWORD NUXT_SAP_ALLOW_SELF_SIGNED_CERT \
+                     DIRECTUS_URL NUXT_DIRECTUS_TOKEN \
+                     NUXT_FEDEX_API_KEY NUXT_FEDEX_SECRET_KEY NUXT_FEDEX_SHIPPER_ACCOUNT \
+                     NUXT_FEDEX_ACCOUNT NUXT_FEDEX_BILL_TO_ACCOUNT NUXT_FEDEX_ENV \
+                     NUXT_UPS_CLIENT_ID NUXT_UPS_CLIENT_SECRET NUXT_UPS_SHIPPER_NUMBER \
+                     NUXT_UPS_ENV NUXT_SQUARE_ACCESS_TOKEN \
+                     NUXT_OPENAI_API_KEY \
+                     NUXT_PRIORITY_ONE_API_URL NUXT_PRIORITY_ONE_API_KEY \
+                     NUXT_PDF_DOWNLOAD_SERVICE_URL NUXT_PDF_DOWNLOAD_SERVICE_USER_NAME \
+                     NUXT_PDF_DOWNLOAD_SERVICE_USER_PASS \
+                     NUXT_TURNSTILE_SECRET_KEY NUXT_MS_FORM_RESPONSES_URL \
+                     NUXT_SERVICEMASTER_WS_URL NUXT_SERVICEMASTER_API_KEY \
+                     NUXT_CF_ACCESS_CLIENT_ID NUXT_CF_ACCESS_CLIENT_SECRET \
+                     NUXT_PUBLIC_PASSWORD_RESET_URL \
+                     NUXT_PUBLIC_DIRECTUS_WEBSOCKET_URL \
+                     NUXT_ASANA_ACCESS_TOKEN NUXT_ASANA_PROJECT_GID \
+                     NUXT_ASANA_BACKLOG_SECTION_GID NUXT_ASANA_FEATURE_REQUEST_TAG_GID \
+                     NUXT_ASANA_BUG_REPORT_TAG_GID NUXT_ASANA_STATUS_FIELD_GID \
+                     NUXT_ASANA_BACKLOG_STATUS_OPTION_GID NUXT_ASANA_TASK_TYPE_GID \
+                     NUXT_ASANA_TASK_TYPE_BACKLOG_STATUS_GID; do
+            emit "$key"
+          done
+
+          # Only reachable if the rm above failed too (no write permission on the directory), so
+          # the file is still someone else's. That is fatal only when the mode is actually
+          # permissive — one already at 600/400 protects the credentials just as well.
+          chmod 600 "$ENV_FILE" 2>/dev/null || {
+            mode=$(stat -c '%a' "$ENV_FILE" 2>/dev/null || echo unknown)
+            case "$mode" in
+              600|400) echo "note: $ENV_FILE is mode $mode but owned by another user — left as-is" ;;
+              *) echo "::error::$ENV_FILE is mode $mode and cannot be chmod'ed (owned by another user), so the credentials would be readable by other host users. On the host: sudo chown \$(id -un) $ENV_FILE"; exit 1 ;;
+            esac
+          }
+          echo "Rendered $ENV_FILE with $(grep -c '=' "$ENV_FILE") variables (values not logged)"
+
+          # Proves the installed compose file resolves against the file just written, so a
+          # missing or malformed value surfaces here rather than half-way through `up`.
+          (cd "$DEPLOY_PATH" && docker compose config --quiet)
+
+      - name: Log in to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+          docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Debug - check secrets presence
+        run: |
+          echo "DIRECTUS_URL length: ${#DIRECTUS_URL_VAL}"
+          echo "DIRECTUS_WEBSOCKET_URL length: ${#DIRECTUS_WEBSOCKET_URL_VAL}"
+          if [ -z "$DIRECTUS_WEBSOCKET_URL_VAL" ]; then
+            echo "DIRECTUS_WEBSOCKET_URL secret is EMPTY or NOT AVAILABLE"
+          else
+            echo "DIRECTUS_WEBSOCKET_URL secret is present"
+          fi
+          # An empty reset URL is not fatal, but it silently sends password-reset
+          # emails to Directus's own URL (SupplyHub) — so say so, loudly.
+          if [ -z "$PASSWORD_RESET_URL_VAL" ]; then
+            echo "::warning::NUXT_PUBLIC_PASSWORD_RESET_URL is EMPTY — reset emails will link to Directus (SupplyHub), not Connect. Set it under Settings > Environments > production (Variables, or Secrets)."
+          else
+            echo "NUXT_PUBLIC_PASSWORD_RESET_URL is present (${#PASSWORD_RESET_URL_VAL} chars)"
+          fi
+        env:
+          DIRECTUS_URL_VAL: ${{ secrets.DIRECTUS_URL }}
+          DIRECTUS_WEBSOCKET_URL_VAL: ${{ secrets.DIRECTUS_WEBSOCKET_URL }}
+          PASSWORD_RESET_URL_VAL: ${{ vars.NUXT_PUBLIC_PASSWORD_RESET_URL || secrets.NUXT_PUBLIC_PASSWORD_RESET_URL }}
+
+      # NUXT_PUBLIC_* values and the /directus proxy target are baked into the
+      # bundle at build time, so prod gets its own image — the dev image is
+      # never promoted. (The dev workflow's NUXT_PUBLIC_SERVICEMASTER_* build
+      # args are intentionally absent: runtimeConfig no longer reads them.)
+      - name: Build Docker image
+        env:
+          # The Dockerfile's RUN --mount npm cache requires BuildKit; force it on
+          # in case the runner's daemon defaults to the classic builder.
+          DOCKER_BUILDKIT: "1"
+          DIRECTUS_URL_VAL: ${{ secrets.DIRECTUS_URL }}
+          DIRECTUS_WEBSOCKET_URL_VAL: ${{ secrets.DIRECTUS_WEBSOCKET_URL }}
+          SQUARE_APPLICATION_ID_VAL: ${{ secrets.NUXT_PUBLIC_SQUARE_APPLICATION_ID }}
+          SQUARE_LOCATION_ID_VAL: ${{ secrets.NUXT_PUBLIC_SQUARE_LOCATION_ID }}
+          TURNSTILE_SITE_KEY_VAL: ${{ secrets.NUXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          # Accept it from either store: it belongs in Variables (it's a URL, not a
+          # secret), but every other value here is a Secret, so fall back to that
+          # rather than silently building with an empty reset URL.
+          PASSWORD_RESET_URL_VAL: ${{ vars.NUXT_PUBLIC_PASSWORD_RESET_URL || secrets.NUXT_PUBLIC_PASSWORD_RESET_URL }}
+        run: |
+          docker build \
+            --build-arg "DIRECTUS_URL=${DIRECTUS_URL_VAL}" \
+            --build-arg "NUXT_PUBLIC_DIRECTUS_WEBSOCKET_URL=${DIRECTUS_WEBSOCKET_URL_VAL}" \
+            --build-arg "NUXT_PUBLIC_SQUARE_APPLICATION_ID=${SQUARE_APPLICATION_ID_VAL}" \
+            --build-arg "NUXT_PUBLIC_SQUARE_LOCATION_ID=${SQUARE_LOCATION_ID_VAL}" \
+            --build-arg "NUXT_PUBLIC_TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY_VAL}" \
+            --build-arg "NUXT_PUBLIC_PASSWORD_RESET_URL=${PASSWORD_RESET_URL_VAL}" \
+            -t "$IMAGE:$IMAGE_TAG" \
+            -t "$IMAGE:${{ github.sha }}" \
+            .
+      - name: Push Docker image
+        run: |
+          docker push "$IMAGE:$IMAGE_TAG"
+          docker push "$IMAGE:${{ github.sha }}"
+
+      - name: Deploy
+        id: deploy
+        run: |
+          cd "$DEPLOY_PATH"
+          docker compose pull
+          docker compose up -d --force-recreate
+      # Port and container name follow the same variables the compose file reads, so changing
+      # either in the environment's variables cannot leave this step probing the old address.
+      - name: Health check
+        env:
+          CONTAINER_NAME: ${{ vars.COMPOSE_APP_CONTAINER_NAME }}
+        run: |
+          echo "Waiting for server to start..."
+          for i in $(seq 1 10); do
+            if curl -sf "http://localhost:$HEALTH_PORT" > /dev/null 2>&1; then
+              echo "Health check passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i/10 failed — retrying in 3s..."
+            sleep 3
+          done
+          echo "Health check failed after 10 attempts"
+          docker logs --tail 50 "$CONTAINER_NAME" || true
+          exit 1
+      # The containers are recreated and the local health check passes, but the
+      # app isn't always reachable through Cloudflare yet — clients that refresh
+      # immediately can briefly hit a Cloudflare error page. Give the edge a few
+      # seconds to settle before broadcasting "new version available". Runs on the
+      # success path only, so the notification is still sent only after a
+      # successful deployment.
+      - name: Wait for app to be reachable before notifying clients
+        if: success()
+        run: sleep 10
+      - name: Notify frontend of new deploy
+        if: success()
+        run: |
+          curl -sf -X POST "http://localhost:$HEALTH_PORT/api/deploy" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKEN }}" \
+            -d '{
+              "version": "${{ env.VERSION }}",
+              "env": "prod"
+            }'
+
+      # Record this release's version as a tag on the merge commit — only
+      # after a successful deploy, mirroring how dev only commits its bump
+      # back after deploying. Tag pushes don't retrigger this workflow (the
+      # trigger matches branches, not tags). Skipped when the commit already
+      # carries its tag (a re-deploy).
+      - name: Tag production release
+        if: success() && env.TAG_EXISTS != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "prod-v${VERSION}"
+          git push origin "prod-v${VERSION}"
+
+      # Every push to prod builds an image tagged with its SHA, so the previous
+      # push's image exists and can actually run again — retag it as the moving
+      # tag before recreating, otherwise compose would just restart the broken
+      # image that was built (and locally tagged) moments ago. The configuration
+      # the rolled-back container needs is already on disk in $DEPLOY_PATH/.env
+      # (the render step ran before Deploy), so recreating picks it up without
+      # repeating the secrets here.
+      - name: Rollback on failure
+        if: failure() && steps.deploy.outcome == 'success'
+        env:
+          PREVIOUS_SHA: ${{ github.event.before }}
+        run: |
+          if [ -z "$PREVIOUS_SHA" ] || printf '%s' "$PREVIOUS_SHA" | grep -Eq '^0+$'; then
+            echo "No previous-push SHA (first push or manual run) — leaving containers as-is"
+            exit 0
+          fi
+          echo "Rolling back to previous image..."
+          if docker pull "$IMAGE:$PREVIOUS_SHA"; then
+            docker tag "$IMAGE:$PREVIOUS_SHA" "$IMAGE:$IMAGE_TAG"
+            cd "$DEPLOY_PATH"
+            docker compose up -d --force-recreate
+            echo "Rollback complete"
+          else
+            echo "No previous image to roll back to — leaving containers as-is"
+          fi

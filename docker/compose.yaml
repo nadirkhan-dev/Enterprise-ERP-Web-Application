@@ -1,0 +1,30 @@
+services:
+  connect:
+    container_name: ${COMPOSE_APP_CONTAINER_NAME:-connect}
+    image: ${COMPOSE_APP_IMAGE:-ghcr.io/libertysupply/connect}:${COMPOSE_APP_VERSION:-dev}
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3000}
+    ports:
+      - ${COMPOSE_APP_PORT:-5175}:${PORT:-3000}
+    cpus: ${COMPOSE_APP_CPUS:-2.0}
+    mem_limit: ${COMPOSE_APP_MEM_LIMIT:-2g}
+    mem_reservation: ${COMPOSE_APP_MEM_RESERVATION:-512m}
+    logging:
+      driver: json-file
+      options:
+        max-size: ${COMPOSE_APP_LOGGING_MAX_SIZE:-10m}
+        max-file: ${COMPOSE_APP_LOGGING_MAX_FILE:-5}
+    networks:
+      - default
+      - servicemaster
+networks:
+  default:
+    name: ${COMPOSE_NETWORK_NAME:-proxy}
+    external: true
+  servicemaster:
+    name: ${COMPOSE_SERVICEMASTER_NETWORK_NAME:-supplyhubdev}
+    external: true

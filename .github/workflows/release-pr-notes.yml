@@ -1,0 +1,217 @@
+name: Release PR Notes
+
+# Fills a dev -> prod release PR's "## Changes" section by aggregating the
+# already-reviewed bullets from every dev PR included in the release, instead
+# of re-summarizing the whole diff the way PR Auto-Summary does for dev PRs
+# (which is why that workflow ignores PRs targeting prod). The prod deploy
+# workflow later extracts these same bullets into the in-app release notes.
+#
+# Re-runs on every push to the release PR (a new dev PR merging while the
+# release is open re-aggregates), so hand-curate the list only after the last
+# dev change has landed — later pushes regenerate the section.
+#
+# Can also be run manually from the Actions tab with a PR number, for the case
+# where the automatic run never fired.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [prod]
+  # Manual escape hatch. A `pull_request` run is suppressed outright when the
+  # PR's head commit carries a skip-ci directive, and nothing in this workflow
+  # can recover from that — no run is ever dispatched. workflow_dispatch is not
+  # subject to the skip, so it re-aggregates against an already-open release PR.
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Release PR number (must target prod)'
+        required: true
+        type: string
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  aggregate-notes:
+    runs-on: ubuntu-latest
+    steps:
+      # Both entry points converge here: the pull_request payload supplies the
+      # PR directly, workflow_dispatch looks it up from the supplied number.
+      - name: Resolve target PR
+        id: target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          INPUT_PR: ${{ inputs.pr_number }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PR: ${{ github.event.pull_request.number }}
+          EVENT_BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            PR_NUMBER="$INPUT_PR"
+
+            if ! echo "$PR_NUMBER" | grep -qE '^[0-9]+$'; then
+              echo "::error::pr_number must be numeric, got '${PR_NUMBER}'."
+              exit 1
+            fi
+
+            # The pull_request path is filtered to prod by `branches:`; dispatch
+            # has no such filter, so enforce the same contract here. Aggregating
+            # onto a dev PR would clobber PR Auto-Summary's bullets.
+            PR_STATE=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.state')
+            BASE_REF=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.base.ref')
+
+            if [ "$BASE_REF" != "prod" ]; then
+              echo "::error::PR #${PR_NUMBER} targets '${BASE_REF}', not prod. Release notes only apply to prod release PRs."
+              exit 1
+            fi
+
+            if [ "$PR_STATE" != "open" ]; then
+              echo "::error::PR #${PR_NUMBER} is '${PR_STATE}'. Only open release PRs can be regenerated."
+              exit 1
+            fi
+          else
+            PR_NUMBER="$EVENT_PR"
+            BASE_REF="$EVENT_BASE"
+          fi
+
+          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "base_ref=${BASE_REF}" >> "$GITHUB_OUTPUT"
+          echo "Target: PR #${PR_NUMBER} -> ${BASE_REF}"
+
+      # Explicit merge ref rather than the default checkout: on workflow_dispatch
+      # the default would be the default branch (dev), not the release PR. This
+      # is the same ref the pull_request path resolves to, so one code path
+      # serves both. A conflicted PR has no merge ref and fails here.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/pull/${{ steps.target.outputs.pr_number }}/merge
+
+      - name: Collect bullets from included dev PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BASE_REF: ${{ steps.target.outputs.base_ref }}
+        run: |
+          # fetch-depth: 0 with an explicit pull ref does not guarantee the base
+          # branch is present as a remote-tracking ref, and the range below needs
+          # it. Same explicit fetch PR Auto-Summary does.
+          git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
+
+          # Every dev PR lands as a "Merge pull request #N" merge commit, so
+          # the release's contents are exactly the merge commits between prod
+          # and this PR's head. --reverse = oldest first, so the notes read
+          # chronologically. The PR merge ref's own synthetic commit ("Merge
+          # <sha> into <sha>") doesn't match the grep and is excluded.
+          git log --merges --reverse --format=%s "origin/${BASE_REF}..HEAD" \
+            | grep -oE '^Merge pull request #[0-9]+' \
+            | grep -oE '[0-9]+' > /tmp/pr_numbers.txt || true
+
+          : > /tmp/bullets_raw.txt
+          while read -r PR; do
+            gh api "repos/$REPO/pulls/$PR" --jq '.body // ""' \
+              | sed -n '/## Changes/,/^## /p' \
+              | grep -E '^\s*- .' >> /tmp/bullets_raw.txt || true
+          done < /tmp/pr_numbers.txt
+
+          # Dedupe exact repeats, and drop the "no user-facing changes"
+          # placeholder unless it is all there is.
+          awk '!seen[$0]++' /tmp/bullets_raw.txt > /tmp/bullets_dedup.txt
+          grep -v 'Internal improvements (no user-facing changes)' /tmp/bullets_dedup.txt > /tmp/bullets.txt || true
+          if [ ! -s /tmp/bullets.txt ]; then
+            cp /tmp/bullets_dedup.txt /tmp/bullets.txt
+          fi
+          if [ ! -s /tmp/bullets.txt ]; then
+            echo "- Internal improvements (no user-facing changes)" > /tmp/bullets.txt
+          fi
+
+          echo "Included dev PRs: $(tr '\n' ' ' < /tmp/pr_numbers.txt)"
+          echo "Aggregated bullets:"
+          cat /tmp/bullets.txt
+
+      - name: Update PR description
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.target.outputs.pr_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          # REST (not `gh pr view`, which uses GraphQL) so this still works if
+          # GraphQL is the blocked endpoint. `// ""` guards a null body.
+          gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""' > /tmp/current_body.md
+
+          # Same section-replacement logic (and markers) as PR Auto-Summary:
+          # replace the entire "## Changes" body with the aggregated block,
+          # preserving the template's HTML comments under the heading.
+          python3 <<'PYEOF' > /tmp/updated_body.md
+          import re, pathlib
+
+          body = pathlib.Path('/tmp/current_body.md').read_text()
+          bullets = pathlib.Path('/tmp/bullets.txt').read_text().strip()
+
+          MARKER_START = '<!-- ai-bullets-start -->'
+          MARKER_END = '<!-- ai-bullets-end -->'
+          ai_block = f'{MARKER_START}\n{bullets}\n{MARKER_END}'
+
+          changes_section = re.compile(
+              r'(^##\s+Changes\s*\n'                                            # heading
+              r'(?:[ \t]*<!--(?!\s*ai-bullets-(?:start|end)\s*-->).*?-->'       # template comments only
+              r'[ \t]*\n)*)'
+              r'.*?'                                                            # current body — replaced
+              r'(?=^##\s|\Z)',                                                  # next heading or EOF
+              re.MULTILINE | re.DOTALL,
+          )
+
+          if changes_section.search(body):
+              new_body = changes_section.sub(
+                  lambda m: f'{m.group(1)}{ai_block}\n\n',
+                  body,
+                  count=1,
+              )
+          else:
+              # No "## Changes" heading at all — prepend one
+              new_body = f'## Changes\n{ai_block}\n\n{body}'
+
+          # Collapse any 3+ consecutive blank lines down to 2 (defensive cleanup)
+          new_body = re.sub(r'\n{3,}', '\n\n', new_body)
+
+          print(new_body, end='')
+          PYEOF
+
+          # REST PATCH (not `gh pr edit`, which uses GraphQL). Build the JSON
+          # with jq so multiline markdown / special chars escape safely.
+          jq -Rs '{ body: . }' /tmp/updated_body.md \
+            | gh api -X PATCH "repos/$REPO/pulls/$PR_NUMBER" --input -
+          echo "Release PR description updated"
+
+      # Validate the FINAL body in this same run — release PRs aren't covered
+      # by the dev-scoped PR Description Check, so this is their gate.
+      - name: Validate Changes section
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.target.outputs.pr_number }}
+          REPO: ${{ github.repository }}
+        run: |
+          PR_BODY=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
+
+          if [ -z "$PR_BODY" ]; then
+            echo "::error::PR description is empty after aggregation."
+            exit 1
+          fi
+
+          if ! echo "$PR_BODY" | grep -q "## Changes"; then
+            echo "::error::Missing '## Changes' section after aggregation."
+            exit 1
+          fi
+
+          CHANGES=$(echo "$PR_BODY" | sed -n '/## Changes/,/## /p' | grep -c '^\s*- .' || true)
+
+          if [ "$CHANGES" -eq 0 ]; then
+            echo "::error::No change items found under ## Changes."
+            exit 1
+          fi
+
+          echo "Found $CHANGES change(s). Release PR description looks good."

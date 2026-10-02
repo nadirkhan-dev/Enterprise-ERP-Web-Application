@@ -1,0 +1,43 @@
+/* Shared text + shape for every status tag — Figma "body-sm/bold"
+   (12px, bold, 16px line-height) on a 2px (radius-xs) pill. Per-status
+   colour follows below. */
+.p-tag.status-active,
+.p-tag.status-inactive,
+.p-tag.status-closed,
+.p-tag.status-pending {
+    font-size: var(--p-font-size-xs);
+    font-weight: var(--p-font-weight-bold);
+    line-height: var(--p-spacing-4);
+    border-radius: var(--p-border-radius-xs);
+}
+
+/* Open / active — success green (#e6f6e5 bg, #006300 text). */
+.p-tag.status-active {
+    background-color: var(--p-mildgreen-50);
+    color: var(--p-mildgreen-900);
+}
+
+/* Cancelled / inactive — danger red. */
+.p-tag.status-inactive {
+    background-color: var(--p-red-50);
+    color: var(--p-red-900);
+}
+
+/* Pending — in-flight / not-yet-committed work (e.g. a request attachment queued
+   for upload). Amber, so it reads as "not done yet" rather than pass (green) or
+   fail (red). */
+.p-tag.status-pending {
+    background-color: var(--p-orange-50);
+    color: var(--p-orange-700);
+}
+
+/* Closed — neutral secondary (#f3f5f6 bg, #1c3c70 text), distinct from cancelled (red). */
+.p-tag.status-closed {
+    background-color: var(--p-surface-50);
+    color: var(--p-deepblue-900);
+}
+
+.p-tag {
+    width: fit-content;
+    font-weight: var(--p-font-weight-medium);
+}

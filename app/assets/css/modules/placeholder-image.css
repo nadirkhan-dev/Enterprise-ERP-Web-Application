@@ -1,0 +1,77 @@
+
+
+/* ── Round profile avatar ────────────────────────────────────────────────── */
+
+.placeholder-avatar__icon {
+    /* Held in its own variable rather than written inline as a var() fallback: a
+       calc() nested directly inside a fallback fails to parse, which silently voids
+       the whole size and drops the glyph to its intrinsic dimensions. */
+    --placeholder-avatar-fallback-size: calc(var(--p-spacing-px) * 150);
+    --placeholder-icon-size: calc(var(--profile-avatar-size, var(--placeholder-avatar-fallback-size)) * 0.4);
+
+    width: var(--placeholder-icon-size);
+    height: var(--placeholder-icon-size);
+    font-size: var(--placeholder-icon-size);
+    color: var(--p-surface-100);
+}
+
+/* ── Table-row thumbnail ─────────────────────────────────────────────────── */
+
+/* With an image: white plate + hairline ring, so a logo on white still reads as
+   a distinct tile. */
+.placeholder-thumb {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: calc(var(--p-spacing-px) * 30);
+    aspect-ratio: 5 / 4;
+    /* Logo inset — the plate-sized echo of .assoc-drawer__logo's 16px circle
+       inset (John/Grace), so artwork sits off the ring instead of touching it.
+       Held at roughly a tenth of the plate rather than a flat 16px: this one is
+       only 30px across, where 16px would leave no artwork at all. Pages that
+       size the plate up scale the inset with it (see .manufacturer-name__thumbnail). */
+    box-sizing: border-box;
+    padding: var(--p-spacing-0.5);
+    border-radius: var(--p-border-radius-xs);
+    background: var(--p-surface-0);
+    border: 1px solid var(--p-surface-200);
+    overflow: hidden;
+}
+
+/* Without an image: the tinted plate IS the affordance, so the ring comes off —
+   otherwise every logo-less row reads as an empty framed box. */
+.placeholder-thumb--empty {
+    background: var(--p-surface-50);
+    border: none;
+}
+
+.placeholder-thumb__img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.placeholder-thumb__loader {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.placeholder-thumb__icon {
+    --placeholder-icon-size: var(--p-spacing-4);
+
+    width: var(--placeholder-icon-size);
+    height: var(--placeholder-icon-size);
+    font-size: var(--placeholder-icon-size);
+    color: var(--p-surface-200);
+}
+
+/* ── PrimeIcons size guard ───────────────────────────────────────────────── */
+
+.placeholder-icon.placeholder-avatar__icon.pi,
+.placeholder-icon.placeholder-thumb__icon.pi {
+    font-size: var(--placeholder-icon-size);
+}

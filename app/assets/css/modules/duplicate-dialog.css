@@ -1,0 +1,55 @@
+.duplicate-dialog {
+    border-radius: var(--p-border-radius-xs);
+    border: 1px solid var(--p-surface-200);
+    box-shadow: var(--p-shadow-xl);
+    min-width: 600px;
+    overflow: clip;
+}
+
+.duplicate-dialog .p-dialog-header {
+    padding: var(--p-spacing-4-375);
+    border-bottom: none;
+    justify-content: flex-end;
+}
+
+.duplicate-dialog .p-dialog-title {
+    display: none;
+}
+
+.duplicate-dialog .p-dialog-header-actions .p-button {
+    box-shadow: none;
+    outline: none;
+    border: none;
+    background: none;
+}
+
+.duplicate-dialog .p-dialog-header-actions .p-button:focus {
+    box-shadow: none;
+    outline: none;
+}
+
+.duplicate-dialog .p-dialog-content {
+    padding: 0 var(--p-spacing-4-375) var(--p-spacing-4-375);
+}
+
+.duplicate-dialog .p-dialog-footer {
+    padding: 0 var(--p-spacing-4-375) var(--p-spacing-4-375);
+}
+
+.duplicate-dialog__message {
+    font-size: var(--p-font-size-sm);
+    color: var(--p-gray-600);
+    line-height: 22px;
+    margin: 0;
+}
+
+.duplicate-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--p-datatable-header-cell-gap);
+    width: 100%;
+}
+
+.duplicate-dialog__actions .p-button-secondary {
+    border-color: transparent;
+}

@@ -1,0 +1,33 @@
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: var(--p-spacing-6) clamp(var(--p-spacing-2), 1.15vw, var(--p-spacing-4));
+
+    @media (min-width: 768px) {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-spacing-2);
+}
+
+.info-label {
+    font-size: var(--p-font-size-sm);
+    color: var(--p-gray-800);
+    display: flex;
+    align-items: center;
+    gap: var(--p-spacing-1);
+}
+
+.info-value {
+    font-size: var(--p-font-size-sm);
+    font-weight: var(--p-font-weight-medium);
+    color: var(--p-deepblue-900);
+    display: flex;
+    align-items: center;
+    gap: var(--p-spacing-1);
+    text-transform: capitalize;
+}
